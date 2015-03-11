@@ -18,4 +18,5 @@ After goto definition, you can pop to previous position with C-c ,
 
 * ToDo
 Calltip expansion is not supported yet.
+
 Search for symbol is not supported yet.
