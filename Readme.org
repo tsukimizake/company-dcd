@@ -1,0 +1,21 @@
+* What's this?
+
+company-mode backend for DCD(https://github.com/Hackerpilot/DCD).
+
+* How to use?
+#+begin_src elisp
+(add-to-list 'load-path "/path/to/company-dcd.el")
+(require 'company-dcd)
+(add-hook 'd-mode-hook 'company-dcd-mode)
+#+end_src
+
+* Keybinds
+Show ddoc with C-c ? 
+
+Goto definition with C-c .
+
+After goto definition, you can pop to previous position with C-c ,
+
+* ToDo
+Calltip expansion is not supported yet.
+Search for symbol is not supported yet.
