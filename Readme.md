@@ -3,7 +3,11 @@ What's this?
 ======
 company-mode backend for Dlang, using DCD(https://github.com/Hackerpilot/DCD).
 
-How to use?
+Installation
+------------
+From melpa.
+
+Configuration
 ------------
 
 Make sure that the `dcd-client` and `dcd-server` binaries are in your `executable-path`. Otherwise, please
