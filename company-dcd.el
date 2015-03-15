@@ -1,6 +1,6 @@
-;;; company-dcd.el --- Auto Completion source for dcd for GNU Emacs
+;;; company-dcd.el --- Company backend for Dlang using DCD.
 
-;; Author: tsukimizake <shomasd@gmail.com>
+;; Author: tsukimizake <shomasd_at_gmail.com>
 ;; Version: 0.1
 ;; Package-Requires: ((company "0.9") (flycheck-dmd-dub "0.7") (yasnippet "0.8") (popwin "0.7"))
 ;; Keywords: languages
@@ -36,14 +36,13 @@
 (require 'company)
 (require 'rx)
 (require 'yasnippet)
-(require 'json)
 (require 'flycheck-dmd-dub)
 (require 'ring)
 (require 'cl-lib)
 (require 'popwin)
 (defgroup company-dcd nil "company-mode backend for DCD." :group 'company)
 
-(defcustom company-dcd--executable
+(defcustom company-dcd-client-executable
   "dcd-client"
   "Location of dcd-client executable."
   :group 'company-dcd
@@ -65,7 +64,7 @@ You can't put port number flag here.  Set `company-dcd--server-port' instead."
 (defconst company-dcd--error-buffer-name "*dcd-error*")
 (defconst company-dcd--output-buffer-name "*dcd-output*")
 (defconst company-dcd--document-buffer-name "*dcd-document*")
-(defcustom company-dcd--server-executable
+(defcustom company-dcd-server-executable
   "dcd-server"
   "Location of dcd-server executable."
   :group 'company-dcd
@@ -98,21 +97,27 @@ If you want to restart server, use `company-dcd-restart-server' instead."
   "Start dcd-server."
   (let ((buf (get-buffer-create "*dcd-server*")))
     (with-current-buffer buf (apply 'start-process "dcd-server" (current-buffer)
-				    company-dcd--server-executable
+				    company-dcd-server-executable
 				    "-p"
 				    (format "%s" company-dcd--server-port)
 				    company-dcd--flags
 				    ))))
 
+(defun company-dcd--server-is-alive-p ()
+  "If dcd-server is alive, return t.  Else, nil."
+  (if (or (get-process "dcd-server") (not (zerop (string-to-number (shell-command-to-string "pidof dcd-server")))))
+      t
+    nil))
+
 (defun company-dcd-maybe-start-server ()
   "Start dcd-server.  When the server process is already running, do nothing."
-  (unless (or (get-process "dcd-server") (not (zerop (string-to-number (shell-command-to-string "pidof dcd-server")))))
+  (unless (company-dcd--server-is-alive-p)
     (company-dcd--start-server)))
 
 (defun company-dcd-restart-server ()
   "Start dcd-server.  When the server process is already running, restart it."
   (interactive)
-  (when (get-process "dcd-server")
+  (when (company-dcd--server-is-alive-p)
     (company-dcd-stop-server)
     (sleep-for 0 company-dcd--delay-after-kill-process))
   (company-dcd--start-server)
@@ -162,7 +167,7 @@ If you want to restart server, use `company-dcd-restart-server' instead."
   "Notify error with result RES and arguments ARGS."
   (let* ((errbuf (get-buffer-create company-dcd--error-buffer-name))
          (outbuf (get-buffer company-dcd--output-buffer-name))
-         (cmd (concat company-dcd--executable " " (mapconcat 'identity args " ")))
+         (cmd (concat company-dcd-client-executable " " (mapconcat 'identity args " ")))
          (errstr
           (with-current-buffer outbuf
             (goto-char (point-min))
@@ -190,12 +195,12 @@ If you want to restart server, use `company-dcd-restart-server' instead."
   (let ((buf (get-buffer-create company-dcd--output-buffer-name))
         res)
     (with-current-buffer buf (erase-buffer))
-    (setq res (if (null company-dcd--executable)
+    (setq res (if (null company-dcd-client-executable)
                   (progn
                     (message "company-dcd error: could not find dcd-client executable")
                     0)
 		(apply 'call-process-region (point-min) (point-max)
-		       company-dcd--executable nil buf nil args)))
+		       company-dcd-client-executable nil buf nil args)))
     (with-current-buffer buf
       (unless (eq 0 res)
         (company-dcd--handle-error res args))
@@ -205,14 +210,20 @@ If you want to restart server, use `company-dcd-restart-server' instead."
   "Get cursor position to pass to dcd-client."
   (position-bytes (point)))
 
-(defsubst company-dcd--build-args (pos)
-  "Build argument list to pass to dcd-client for position POS."
-  (list
-   "-c"
-   (format "%s" pos)
-   "-p"
-   (format "%s" company-dcd--server-port)
-   ))
+(defsubst company-dcd--build-args (&optional pos)
+  "Build argument list to pass to dcd-client for position POS.
+If pos was not provided or nil, it will do what you mean."
+  (if pos 
+      (list
+       "-c"
+       (format "%s" pos)
+       "-p"
+       (format "%s" company-dcd--server-port)
+       )
+    (list
+     "-p"
+     (format "%s" company-dcd--server-port)
+     )))
 
 
 (defsubst company-dcd--in-string/comment ()
@@ -237,10 +248,10 @@ If you want to restart server, use `company-dcd-restart-server' instead."
     (save-restriction
       (widen)
       (save-excursion
-	  (company-dcd--adjust-cursor-on-completion (point))
-	  (company-dcd--call-process
-	   (company-dcd--build-args (company-dcd--cursor-position))))
-	(company-dcd--parse-output-for-completion))))
+	(company-dcd--adjust-cursor-on-completion (point))
+	(company-dcd--call-process
+	 (company-dcd--build-args (company-dcd--cursor-position))))
+      (company-dcd--parse-output-for-completion))))
 
 (defun company-dcd--document (item)
   "Return popup document of `ITEM'."
@@ -489,7 +500,7 @@ dcd-client outputs candidates which begin with \"this\" when completing struct c
     ))
 
 (defun company-dcd--calltips-for-struct-constructor (command &optional arg &rest ignored)
-  "dcd calltip completion."
+  "dcd calltip completion for struct constructor."
   (interactive (list 'interactive))
   (case command
     (interactive (company-begin-backend 'company-dcd--calltips))
@@ -582,14 +593,16 @@ dcd-client outputs candidates which begin with \"this\" when completing struct c
       ;; Cleanup the marker so as to avoid them piling up.
       (set-marker marker nil nil))))
 
+(cl-defstruct company-dcd--position-data file type offset)
+
 (defun company-dcd-goto-definition ()
   "Goto declaration of symbol at point."
   (interactive)
   (save-buffer)
   (company-dcd--call-process-for-symbol-declaration)
   (let* ((data (company-dcd--parse-output-for-get-symbol-declaration))
-         (file (car data))
-         (offset (cdr data)))
+         (file (company-dcd--position-data-file data))
+         (offset (company-dcd--position-data-offset data)))
     (if (equal data '(nil . nil))
         (message "Not found")
       (progn
@@ -602,7 +615,7 @@ dcd-client outputs candidates which begin with \"this\" when completing struct c
 ;; utilities for goto-definition
 
 (defun company-dcd--call-process-for-symbol-declaration ()
-  "Get location of symbol declaration with `dcd-client --symbolLocation'."
+  "Call process for `dcd-client --symbolLocation'."
   (let ((args
          (append
           (company-dcd--build-args (company-dcd--cursor-position))
@@ -618,16 +631,54 @@ dcd-client outputs candidates which begin with \"this\" when completing struct c
 
 (defun company-dcd--parse-output-for-get-symbol-declaration ()
   "Parse output of `company-dcd--get-symbol-declaration'.
-output is just like following.\n
-`(cons \"PATH_TO_IMPORT/import/std/stdio.d\" \"63946\")'"
+output is a company-dcd--position-data, whose `type' is nil."
   (let ((buf (get-buffer-create company-dcd--output-buffer-name)))
     (with-current-buffer buf
       (goto-char (point-min))
       (if (not (string= "Not found\n" (buffer-string)))
           (progn (re-search-forward (rx (submatch (* nonl)) "\t" (submatch (* nonl)) "\n"))
-                 (cons (match-string 1) (match-string 2)))
-        (cons nil nil)))
+                 (make-company-dcd--position-data :file (match-string 1) :offset (match-string 2)))
+        nil))
     ))
+
+;;; symbol location. Not available yet!
+;; I'm wondering about the user interface. helm-swoop integration or something would be ideal...
+
+(defvar company-dcd--symbol-location-pattern
+  (rx (and bol (submatch (* nonl)) "\t" (submatch char) "\t" (submatch (* digit)) eol))
+  "Regex pattern to parse dcd output for symbol location.")
+
+(defun company-dcd--parse-output-for-symbol-location ()
+  "Return a list of company-dcd--position-data."
+  (let (res)
+    (while (re-search-forward company-dcd--symbol-location-pattern nil t)
+      (add-to-list 'res
+		   (make-company-dcd--position-data
+		    :file (match-string 1)
+		    :type (match-string 2)
+		    :offset (string-to-number (match-string 3))
+		    )))
+    res))
+
+(defun company-dcd--call-process-for-symbol-location (str)
+  "Search symbol with `dcd-client --search."
+  (save-buffer)
+  (let ((args
+         (append
+          (company-dcd--build-args)
+          '("-s")
+	  (list str)))
+        )
+    
+    (with-current-buffer company-dcd--output-buffer-name
+      (erase-buffer)
+      (company-dcd--call-process args)
+      (buffer-string))
+    ))
+
+
+
+;;; automatic add-imports.
 
 (defun company-dcd--parent-directory (dir)
   "Return parent directory of DIR."
@@ -656,12 +707,12 @@ output is just like following.\n
   "Extract import flags from dmd.conf file."
   (let ((dmd-conf-filename
          (cl-find-if 'file-exists-p
-                  (list
-                   ;; TODO: the first directory to look into should be dmd's current
-                   ;; working dir
-                   (concat (getenv "HOME") "/dmd.conf")
-                   (concat (company-dcd--parent-directory (executable-find "dmd")) "dmd.conf")
-                   "/etc/dmd.conf"))))
+		     (list
+		      ;; TODO: the first directory to look into should be dmd's current
+		      ;; working dir
+		      (concat (getenv "HOME") "/dmd.conf")
+		      (concat (company-dcd--parent-directory (executable-find "dmd")) "dmd.conf")
+		      "/etc/dmd.conf"))))
 
     ;; TODO: this extracting procedure is pretty rough, it just searches for
     ;; the first occurrence of the DFLAGS
@@ -674,8 +725,8 @@ output is just like following.\n
         (let ((flags-list (split-string (buffer-substring-no-properties
                                          (point) (line-end-position)))))
           (cl-remove-if-not (lambda (s)
-                            (string-prefix-p "-I" s))
-                         flags-list))))))
+			      (string-prefix-p "-I" s))
+			    flags-list))))))
 
 (defun company-dcd--add-imports ()
   "Send import flags of the current DUB project to dcd-server.
