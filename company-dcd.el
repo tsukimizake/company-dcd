@@ -650,15 +650,17 @@ output is a company-dcd--position-data, whose `type' is nil."
 
 (defun company-dcd--parse-output-for-symbol-location ()
   "Return a list of company-dcd--position-data."
-  (let (res)
-    (while (re-search-forward company-dcd--symbol-location-pattern nil t)
-      (add-to-list 'res
-		   (make-company-dcd--position-data
-		    :file (match-string 1)
-		    :type (match-string 2)
-		    :offset (string-to-number (match-string 3))
-		    )))
-    res))
+  (with-current-buffer company-dcd--output-buffer-name
+    (goto-char (point-min))
+    (let (res)
+      (while (re-search-forward company-dcd--symbol-location-pattern nil t)
+	(add-to-list 'res
+		     (make-company-dcd--position-data
+		      :file (match-string 1)
+		      :type (match-string 2)
+		      :offset (string-to-number (match-string 3)))
+		     ))
+      res)))
 
 (defun company-dcd--call-process-for-symbol-location (str)
   "Search symbol with `dcd-client --search."
@@ -667,16 +669,22 @@ output is a company-dcd--position-data, whose `type' is nil."
          (append
           (company-dcd--build-args)
           '("-s")
-	  (list str)))
-        )
+	  (list str))))
     
     (with-current-buffer company-dcd--output-buffer-name
       (erase-buffer)
-      (company-dcd--call-process args)
-      (buffer-string))
+      (company-dcd--call-process args))))
+
+(defun company-dcd-symbol-location (str)
+  (company-dcd--call-process-for-symbol-location str)
+  (company-dcd--parse-output-for-symbol-location))
+
+(defun company-dcd--goto-line-of-location (pos-data)
+  (let ((file (company-dcd--position-data-file pos-data))
+	(offset (company-dcd--position-data-offset pos-data)))
+    (find-file file)
+    (goto-char (byte-to-position offset))
     ))
-
-
 
 ;;; automatic add-imports.
 
