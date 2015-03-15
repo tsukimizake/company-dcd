@@ -5,7 +5,8 @@ company-mode backend for Dlang, using DCD(https://github.com/Hackerpilot/DCD).
 
 Installation
 ------------
-From melpa.
+First, follow setup section of DCD's readme.
+And `M-x package-install company-dcd` on your Emacs.
 
 Configuration
 ------------
