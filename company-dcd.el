@@ -2,7 +2,7 @@
 
 ;; Author: tsukimizake <shomasd_at_gmail.com>
 ;; Version: 0.1
-;; Package-Requires: ((company "0.9") (flycheck-dmd-dub "0.7") (yasnippet "0.8") (popwin "0.7") (cl-lib "0.5"))
+;; Package-Requires: ((company "0.9") (flycheck-dmd-dub "0.7") (yasnippet "0.8") (popwin "0.7") (cl-lib "0.5") (helm "1.5.6"))
 ;; Keywords: languages
 ;; URL: http://github.com/tsukimizake/company-dcd
 
@@ -40,6 +40,8 @@
 (require 'ring)
 (require 'cl-lib)
 (require 'popwin)
+(require 'helm)
+
 (defgroup company-dcd nil "company-mode backend for DCD." :group 'company)
 
 (defcustom company-dcd-client-executable
@@ -95,6 +97,10 @@ If you want to restart server, use `company-dcd-restart-server' instead."
 
 (defsubst company-dcd--start-server ()
   "Start dcd-server."
+
+  (unless (executable-find company-dcd-server-executable)
+    (error "company-dcd error! dcd-server is not found."))
+  
   (let ((buf (get-buffer-create "*dcd-server*")))
     (with-current-buffer buf (apply 'start-process "dcd-server" (current-buffer)
 				    company-dcd-server-executable
@@ -195,7 +201,7 @@ If you want to restart server, use `company-dcd-restart-server' instead."
   (let ((buf (get-buffer-create company-dcd--output-buffer-name))
         res)
     (with-current-buffer buf (erase-buffer))
-    (setq res (if (null company-dcd-client-executable)
+    (setq res (if (null (executable-find company-dcd-client-executable))
                   (progn
                     (message "company-dcd error: could not find dcd-client executable")
                     0)
@@ -641,19 +647,18 @@ output is a company-dcd--position-data, whose `type' is nil."
         nil))
     ))
 
-;;; symbol location. Not available yet!
-;; I'm wondering about the user interface. helm-swoop integration or something would be ideal...
+;;; symbol search.
 
-(defvar company-dcd--symbol-location-pattern
+(defvar company-dcd--symbol-search-pattern
   (rx (and bol (submatch (* nonl)) "\t" (submatch char) "\t" (submatch (* digit)) eol))
   "Regex pattern to parse dcd output for symbol location.")
 
-(defun company-dcd--parse-output-for-symbol-location ()
+(defun company-dcd--parse-output-for-symbol-search ()
   "Return a list of company-dcd--position-data."
   (with-current-buffer company-dcd--output-buffer-name
     (goto-char (point-min))
     (let (res)
-      (while (re-search-forward company-dcd--symbol-location-pattern nil t)
+      (while (re-search-forward company-dcd--symbol-search-pattern nil t)
 	(add-to-list 'res
 		     (make-company-dcd--position-data
 		      :file (match-string 1)
@@ -662,9 +667,8 @@ output is a company-dcd--position-data, whose `type' is nil."
 		     ))
       res)))
 
-(defun company-dcd--call-process-for-symbol-location (str)
-  "Search symbol with `dcd-client --search."
-  (save-buffer)
+(defun company-dcd--call-process-for-symbol-search (str)
+  "Call DCD process to search symbol."
   (let ((args
          (append
           (company-dcd--build-args)
@@ -672,19 +676,61 @@ output is a company-dcd--position-data, whose `type' is nil."
 	  (list str))))
     
     (with-current-buffer company-dcd--output-buffer-name
-      (erase-buffer)
       (company-dcd--call-process args))))
 
-(defun company-dcd-symbol-location (str)
-  (company-dcd--call-process-for-symbol-location str)
-  (company-dcd--parse-output-for-symbol-location))
+(defun company-dcd-symbol-search (str)
+  "Search symbol using DCD with query `STR'.
+Return a list of `company-dcd--position-data'."
+  (company-dcd--call-process-for-symbol-search str)
+  (company-dcd--parse-output-for-symbol-search))
 
-(defun company-dcd--goto-line-of-location (pos-data)
-  (let ((file (company-dcd--position-data-file pos-data))
-	(offset (company-dcd--position-data-offset pos-data)))
-    (find-file file)
-    (goto-char (byte-to-position offset))
-    ))
+(defun company-dcd--find-file-of-pos-data (pos-data)
+  (find-file-noselect (company-dcd--position-data-file pos-data)))
+
+(defun company-dcd--goto-char-of-pos-data (pos-data)
+  (goto-char (byte-to-position (company-dcd--position-data-offset pos-data))))
+
+(defun company-dcd--format-helm-dcd-search-result (pos-data)
+  "Format `POS-DATA' to helm's file-line candidate style."
+  
+  (defun line-string-at-pos ()
+    (let ((beg (point-at-bol))
+	  (end (point-at-eol)))
+      (buffer-substring-no-properties beg end)))
+  
+  (with-current-buffer (company-dcd--find-file-of-pos-data pos-data)
+    (company-dcd--goto-char-of-pos-data pos-data)
+    (let ((fname (company-dcd--position-data-file pos-data))
+	  (line (line-number-at-pos))
+	  (str (line-string-at-pos)))
+      
+      (format "%s:%s:%s" fname line str))))
+
+(defun company-dcd--read-query-or-region-str ()
+  "If region is active, return the region string.  
+Else, read query."
+  (if (region-active-p)
+      (buffer-substring-no-properties (region-beginning) (region-end))
+      (read-string "query: ")))
+
+(defvar helm-c-source-company-dcd-search
+  '(
+    (name . "dcd-search")
+    (init . (lambda ()
+	      (let* ((query (company-dcd--read-query-or-region-str))
+		     (res (company-dcd-symbol-search query)))
+		(with-current-buffer (helm-candidate-buffer 'local)
+		  (insert (mapconcat 'company-dcd--format-helm-dcd-search-result res "\n"))))))
+    (candidates-in-buffer)
+    (type . file-line)))
+
+(defun company-dcd-helm-search-symbol ()
+  "DCD symbol search with helm interface."
+  (interactive)
+  (company-dcd--goto-def-push-marker)
+  (helm 'helm-c-source-company-dcd-search)
+  (recenter))
+
 
 ;;; automatic add-imports.
 
@@ -751,6 +797,7 @@ or package.json file."
 (define-key company-dcd-mode-map (kbd "C-c ?") 'company-dcd-show-ddoc-with-buffer)
 (define-key company-dcd-mode-map (kbd "C-c .") 'company-dcd-goto-definition)
 (define-key company-dcd-mode-map (kbd "C-c ,") 'company-dcd-goto-def-pop-marker)
+(define-key company-dcd-mode-map (kbd "C-c s") 'company-dcd-helm-search-symbol)
 
 ;;;###autoload
 (define-minor-mode company-dcd-mode "company-backend for Dlang Completion Demon, aka DCD."
@@ -767,7 +814,6 @@ or package.json file."
 	     (add-to-list 'popwin:special-display-config
 			  `(,company-dcd--document-buffer-name :position right :width 80)))
     ))
-
 
 (provide 'company-dcd)
 ;;; company-dcd.el ends here
