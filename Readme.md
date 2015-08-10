@@ -11,8 +11,7 @@ And `M-x package-install company-dcd` on your Emacs.
 Configuration
 ------------
 
-1: Make sure that the `dcd-client` and `dcd-server` binaries are in your `executable-path`. Otherwise, please
-set the variables  `company-dcd-client-executable` and `company-dcd-server-executable` using `M-x customize`.
+1: Make sure `dcd-client` and `dcd-server` binaries are in your `executable-path`. Otherwise, please set the variables  `company-dcd-client-executable` and `company-dcd-server-executable` using `M-x customize`.
 
 2: Insert following to your init.el.
 ```
