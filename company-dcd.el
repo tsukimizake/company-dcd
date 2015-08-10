@@ -293,12 +293,14 @@ If pos was not provided or nil, it will do what you mean."
      ((string= "f" candidate-type) ; when it was a function
       (run-with-idle-timer 0 nil (lambda ()
 				   (company-begin-backend 'company-dcd--calltips)
-				   )))
+				   (let ((this-command 'company-idle-begin))
+				     (company-post-command)))))
      ((string= "s" candidate-type) ; when it was a struct
       (run-with-idle-timer 0 nil (lambda ()
-				   (company-begin-backend 'company-dcd--calltips-for-struct-constructor)))
-      )
-     )))
+				   (company-begin-backend 'company-dcd--calltips-for-struct-constructor)
+				   (let ((this-command 'company-idle-begin))
+				     (company-post-command))))
+      ))))
 
 (defvar company-dcd-mode nil)
 
@@ -734,7 +736,7 @@ Else, read query."
   (helm 'helm-c-source-company-dcd-search)
   (recenter))
 
-
+
 ;;; automatic add-imports.
 
 (defun company-dcd--parent-directory (dir)
@@ -809,6 +811,7 @@ or package.json file."
   :keymap company-dcd-mode-map
   (if company-dcd-mode
       (progn (company-mode-on)
+	     (yas-minor-mode-on)
 	     (company-dcd-maybe-start-server)
 	     (company-dcd--add-imports)
 	     (add-to-list 'company-backends 'company-dcd)

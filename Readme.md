@@ -11,9 +11,10 @@ And `M-x package-install company-dcd` on your Emacs.
 Configuration
 ------------
 
-Make sure that the `dcd-client` and `dcd-server` binaries are in your `executable-path`. Otherwise, please
+1: Make sure that the `dcd-client` and `dcd-server` binaries are in your `executable-path`. Otherwise, please
 set the variables  `company-dcd-client-executable` and `company-dcd-server-executable` using `M-x customize`.
-And insert following to your init.el.
+
+2: Insert following to your init.el.
 ```
 (require 'company-dcd)
 (add-hook 'd-mode-hook 'company-dcd-mode)
@@ -28,8 +29,4 @@ Keybinds
 
 Known issues
 ------------
-Currently, calltip completion requires one extra key push.
-Pushing any key after symbol completion will execute calltip completion.
-
-
-
+None. If you find something curious, fell free to make issue. 
