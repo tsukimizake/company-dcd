@@ -771,13 +771,19 @@ Else, read query."
 		      ;; working dir
 		      (concat (getenv "HOME") "/dmd.conf")
 		      (concat (company-dcd--parent-directory (executable-find "dmd")) "dmd.conf")
+		      (concat (company-dcd--parent-directory
+                	(company-dcd--parent-directory
+                	(executable-find "dmd"))) "etc/dmd.conf")
+		      (concat (company-dcd--parent-directory
+                	(company-dcd--parent-directory
+                	(executable-find "dmd"))) "etc/dmd/dmd.conf")
 		      "/etc/dmd.conf"))))
 
     ;; TODO: this extracting procedure is pretty rough, it just searches for
     ;; the first occurrence of the DFLAGS
     (save-window-excursion
       (with-temp-buffer
-        (find-file dmd-conf-filename)
+        (insert-file-contents dmd-conf-filename)
         (goto-char (point-min))
         (search-forward "\nDFLAGS")
         (skip-chars-forward " =")
