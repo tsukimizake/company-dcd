@@ -783,7 +783,7 @@ Else, read query."
     ;; the first occurrence of the DFLAGS
     (save-window-excursion
       (with-temp-buffer
-        (find-file dmd-conf-filename)
+        (insert-file-contents dmd-conf-filename)
         (goto-char (point-min))
         (search-forward "\nDFLAGS")
         (skip-chars-forward " =")
