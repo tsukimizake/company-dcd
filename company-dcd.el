@@ -300,6 +300,12 @@ If pos was not provided or nil, it will do what you mean."
 				   (company-begin-backend 'company-dcd--calltips-for-struct-constructor)
 				   (let ((this-command 'company-idle-begin))
 				     (company-post-command))))
+      )
+     ((string= "c" candidate-type) ; when it was a class
+      (run-with-idle-timer 0 nil (lambda ()
+				   (company-begin-backend 'company-dcd--calltips-for-struct-constructor)
+				   (let ((this-command 'company-idle-begin))
+				     (company-post-command))))
       ))))
 
 (defvar company-dcd-mode nil)
