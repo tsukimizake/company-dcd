@@ -1,6 +1,6 @@
 
 ;;; Commentary:
-;; use obsolete helm's type-attribute 'file-line'.
+;; use helm's obsolete type-attribute `file-line'.
 ;; This code is from http://rubikitch.com/f/mylisp-helm-file-line.el
 
 ;;; Code:
@@ -21,7 +21,7 @@ It is used with type attribute 'line'."
 ;;; Type attributes
 ;;
 ;;
-(define-helm-type-attribute 'line
+(define-helm-type-attribute 'company-dcd-line
     '((display-to-real . company-dcd--helm-display-to-real-numbered-line)
       (action ("Go to Line" . company-dcd--helm-action-line-goto)))
   "LINENO:CONTENT string, eg. \"  16:foo\".
@@ -40,7 +40,7 @@ content is CONTENT near the LINENO.
 If `recenter' attribute is specified, the line is displayed at
 the center of window, otherwise at the top of window.")
 
-(define-helm-type-attribute 'file-line
+(define-helm-type-attribute 'company-dcd-file-line
     `((filtered-candidate-transformer company-dcd--helm-filtered-candidate-transformer-file-line)
       (multiline)
       (action ("Go to" . company-dcd--helm-action-file-line-goto)))

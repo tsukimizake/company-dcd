@@ -733,7 +733,7 @@ Else, read query."
 		(with-current-buffer (helm-candidate-buffer 'local)
 		  (insert (mapconcat 'company-dcd--format-helm-dcd-search-result res "\n"))))))
     (candidates-in-buffer)
-    (type . file-line)))
+    (type . company-dcd-file-line)))
 
 (defun company-dcd-helm-search-symbol ()
   "DCD symbol search with helm interface."
