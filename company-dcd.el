@@ -807,6 +807,7 @@ or package.json file."
   (interactive)
   (company-dcd--call-process
    (append
+    (company-dcd--build-args)
     (company-dcd--find-imports-std)
     (company-dcd--find-imports-dub))))
 
