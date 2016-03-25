@@ -563,32 +563,33 @@ Currently, it simply unescapes \n and \\n."
     ))
 
 (defun company-dcd--get-ddoc ()
-  "Retrieve symbol documentation using \"dcd-client --doc\"."
+  "Retrieve symbol documentation using \"dcd-client --doc\".
+
+Return nil on error or if the symbol is not documented."
   (let ((args
          (append
           (company-dcd--build-args (company-dcd--cursor-position))
-          '("--doc")))
-        )
+          '("--doc"))))
 
       (let ((result (company-dcd--call-process args)))
-	(when (or
-	       (null result)		 	; invocation failed
-	       (string= result "\n\n\n")	; symbol has no documentation
-	       (string= result "")		; no symbol at cursor etc.
-	     )
-	  (error "No documentation for the symbol at point."))
-	result)
-      ))
+	(when (and
+	       result			; invocation succeeded
+	       (string-match (rx (not (syntax whitespace)))
+			     result))	; result not empty (contains non-whitespace)
+	  result))))
 
 (defun company-dcd-show-ddoc-with-buffer ()
   "Display Ddoc of symbol at point using `display-buffer'."
   (interactive)
 
   (let ((raw-doc (company-dcd--get-ddoc)))
-    (with-current-buffer (get-buffer-create company-dcd--documentation-buffer-name)
-      (insert raw-doc)))
-  (company-dcd--reformat-documentation)
-  (display-buffer (get-buffer-create company-dcd--documentation-buffer-name)))
+    (if raw-doc
+	(progn
+	  (with-current-buffer (get-buffer-create company-dcd--documentation-buffer-name)
+	    (insert raw-doc))
+	  (company-dcd--reformat-documentation)
+	  (display-buffer (get-buffer-create company-dcd--documentation-buffer-name)))
+      (message "No documentation for the symbol at point."))))
 
 
 ;; Go to definition
