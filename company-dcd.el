@@ -338,17 +338,17 @@ When the symbol is not a function, return nil."
 
 (defun company-dcd--call-process-for-calltips ()
   "Call process to get calltips of the function at point."
-  (let (result)
-    (insert "( ;")
-    (backward-char 2)
+  (let* ((src (buffer-string))
+	 (pt (point)))
+    (with-temp-buffer
+      (insert src)
+      (goto-char pt)
 
-    (setq result (company-dcd--call-process
-     (company-dcd--build-args (company-dcd--cursor-position))))
+      (insert "( ;")
+      (backward-char 2)
 
-    (forward-char 2)
-    (delete-char -3)
-
-    result))
+      (company-dcd--call-process
+       (company-dcd--build-args (company-dcd--cursor-position))))))
 
 
 (defconst company-dcd--normal-calltip-pattern
