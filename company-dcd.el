@@ -615,16 +615,15 @@ dcd-client outputs candidates which begin with \"this\" when completing struct c
   (interactive)
   (save-buffer)
   (company-dcd--call-process-for-symbol-declaration)
-  (let* ((data (company-dcd--parse-output-for-get-symbol-declaration))
-         (file (company-dcd--position-data-file data))
-         (offset (company-dcd--position-data-offset data)))
-    (if (equal data '(nil . nil))
-        (message "Not found")
-      (progn
-        (company-dcd--goto-def-push-marker)
-        (unless (string=  file "stdin") ; the declaration is in the current file
-          (find-file file))
-        (goto-char (byte-to-position (string-to-number offset)))))))
+  (let ((data (company-dcd--parse-output-for-get-symbol-declaration)))
+    (if data
+	(let* ((file (company-dcd--position-data-file data))
+	       (offset (company-dcd--position-data-offset data)))
+	  (company-dcd--goto-def-push-marker)
+	  (unless (string=  file "stdin") ; the declaration is in the current file
+	    (find-file file))
+	  (goto-char (byte-to-position offset)))
+      (message "Not found"))))
 
 
 ;; utilities for goto-definition
@@ -651,7 +650,9 @@ output is a company-dcd--position-data, whose `type' is nil."
       (goto-char (point-min))
       (if (not (string= "Not found\n" (buffer-string)))
           (progn (re-search-forward (rx (submatch (* nonl)) "\t" (submatch (* nonl)) "\n"))
-                 (make-company-dcd--position-data :file (match-string 1) :offset (match-string 2)))
+                 (make-company-dcd--position-data
+		  :file (match-string 1)
+		  :offset (1+ (string-to-number (match-string 2)))))
         nil))
     ))
 
