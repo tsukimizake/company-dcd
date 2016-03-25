@@ -636,10 +636,22 @@ Currently, it simply unescapes \n and \\n."
 
 ;; Utilities for goto-definition
 
+(defun company-dcd--word-char-p (char)
+  "Return t if CHAR is a D word char (part of an identifier), nil otherwise."
+  (member (char-syntax char) '(?w ?_)))
+
 (defun company-dcd--call-process-for-symbol-declaration ()
   "Call process for `dcd-client --symbolLocation'."
-  (company-dcd--call-process
-   (append (company-dcd--build-args (company-dcd--cursor-position)) '("--symbolLocation"))))
+  (let ((pos (company-dcd--cursor-position)))
+
+    ;; Work around https://github.com/Hackerpilot/DCD/issues/98
+    (when (and
+	   (not (company-dcd--word-char-p (char-before (point))))
+	   (company-dcd--word-char-p (char-after (point))))
+      (setq pos (1+ pos)))
+
+    (company-dcd--call-process
+     (append (company-dcd--build-args pos) '("--symbolLocation")))))
 
 (defun company-dcd--parse-output-for-get-symbol-declaration ()
   "Parse output of `company-dcd--get-symbol-declaration'.
