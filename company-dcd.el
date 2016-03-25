@@ -101,7 +101,7 @@ If you need to restart the server, use `company-dcd-restart-server' instead."
   "Start dcd-server."
 
   (unless (executable-find company-dcd-server-executable)
-    (error "company-dcd error: dcd-server not found."))
+    (error "company-dcd error: dcd-server not found"))
   
   (let ((buf (get-buffer-create "*dcd-server*")))
     (with-current-buffer buf (apply 'start-process "dcd-server" (current-buffer)
@@ -139,7 +139,7 @@ If you need to restart the server, use `company-dcd-restart-server' instead."
       (let ((str (company-dcd--call-process '("--version")))
 	    verstr)
 	(unless str
-	  (error "company-dcd error: Error obtaining dcd-server version."))
+	  (error "company-dcd error: Error obtaining dcd-server version"))
 	(string-match (rx "v" (submatch (* nonl)) (or "-" "\n")) str)
 	(setq verstr (match-string 1 str))
 	(setq company-dcd--version (string-to-number verstr))
@@ -611,7 +611,7 @@ Return nil on error or if the symbol is not documented."
   "Goto the point where `company-dcd-goto-definition' was last called."
   (interactive)
   (if (ring-empty-p company-dcd--goto-definition-marker-ring)
-      (error "Marker ring is empty. Can't pop.")
+      (error "Marker ring is empty, can't pop")
     (let ((marker (ring-remove company-dcd--goto-definition-marker-ring 0)))
       (switch-to-buffer (or (marker-buffer marker)
                             (error "Buffer has been deleted")))
