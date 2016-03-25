@@ -323,7 +323,8 @@ Used to display the argument list (calltips)."
     (candidates (company-dcd--get-candidates))
     (annotation (format " %s" (company-dcd--get-help arg)))
     (meta (company-dcd--documentation arg))
-    (post-completion (company-dcd--action arg))))
+    (post-completion (company-dcd--action arg))
+    (doc-buffer (company-dcd--get-completion-documentation arg))))
 
 
 ;; Function calltip expansion with yasnippet
@@ -590,6 +591,38 @@ Return nil on error or if the symbol is not documented."
 	  (company-dcd--reformat-documentation)
 	  (display-buffer (get-buffer-create company-dcd--documentation-buffer-name)))
       (message "No documentation for the symbol at point."))))
+
+
+(defun company-dcd--call-process-with-compl (lastcompl switch)
+  "Call dcd-client with a hypothetically-expanded completion candidate.
+
+Create a temporary buffer, which is a copy of the current buffer but with
+LASTCOMPL expanded.  Execute DCD with the additional parameter SWITCH.
+Return the result."
+  (let ((src (buffer-string))
+	(pt (point)))
+    (with-temp-buffer
+      (insert src)
+      (goto-char pt)
+
+      (delete-char (- 0 (length (company-grab-symbol))))
+      (insert lastcompl)
+
+      (company-dcd--call-process
+         (append
+          (company-dcd--build-args (company-dcd--cursor-position))
+          (list switch))))))
+
+(defun company-dcd--get-completion-documentation (lastcompl)
+  "Company callback for displaying the documentation for a completion candidate."
+  (let ((raw-doc (company-dcd--call-process-with-compl lastcompl "--doc")))
+    (when raw-doc
+      (company-doc-buffer
+       (with-current-buffer (get-buffer-create company-dcd--documentation-buffer-name)
+	 (erase-buffer)
+	 (insert raw-doc)
+	 (company-dcd--reformat-documentation)
+	 (buffer-string))))))
 
 
 ;; Go to definition
