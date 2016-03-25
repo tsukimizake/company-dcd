@@ -507,7 +507,8 @@ This function should be called at *dcd-output* buf."
      (company-dcd--get-calltip-candidates)
      )
     (post-completion (company-dcd--calltip-action arg))
-    ))
+    (doc-buffer (company-dcd--get-completion-documentation arg))
+    (location (company-dcd--get-completion-location arg))))
 
 ;; Struct constructor calltip expansion
 
@@ -536,7 +537,8 @@ dcd-client outputs candidates which begin with \"this\" when completing struct c
     (candidates
      (company-dcd--get-calltip-candidate-for-struct-constructor arg))
     (post-completion (company-dcd--calltip-action arg))
-    ))
+    (doc-buffer (company-dcd--get-completion-documentation arg))
+    (location (company-dcd--get-completion-location arg))))
 
 
 ;; Documentation display
@@ -607,7 +609,9 @@ Return the result."
       (goto-char pt)
 
       (delete-char (- 0 (length (company-grab-symbol))))
-      (insert lastcompl)
+      (save-excursion
+	(insert lastcompl))
+      (forward-char)
 
       (company-dcd--call-process
          (append
