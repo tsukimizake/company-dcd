@@ -249,27 +249,13 @@ Optionally, pass POS as the --cursorPos argument if non-nil."
   "Return non-nil if point is in a literal (a comment or string)."
   (nth 8 (syntax-ppss)))
 
-(defsubst company-dcd--adjust-point-for-completion ()
-  "Adjust point so that it points to the beginning of a symbol.
-
-Required for correct completion behavior for newer versions of DCD."
-
-  ;; I'm not sure if it is exactly 0.4. If the completion doesn't work on older dcd, please report.
-  (when (> 0.4 (company-dcd--get-version))
-    (return))
-  
-  (while (not (string-match (rx (or blank "." "\n")) (char-to-string (char-before (point)))))
-    (backward-char)))
-
 ;; Interface functions to company-mode.
 
 (defun company-dcd--get-candidates ()
   "Retrieve ordinary auto-completion candidates."
   (unless (company-dcd--in-string/comment)
-    (when (save-excursion
-	    (company-dcd--adjust-point-for-completion)
-	    (company-dcd--call-process
-	     (company-dcd--build-args (company-dcd--cursor-position))))
+    (when (company-dcd--call-process
+	   (company-dcd--build-args (company-dcd--cursor-position)))
       (company-dcd--parse-output-for-completion))))
 
 (defun company-dcd--documentation (item)
