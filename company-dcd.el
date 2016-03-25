@@ -340,8 +340,8 @@ When the symbol is not a function, return nil."
 
 (defun company-dcd--call-process-for-calltips ()
   "Call process to get calltips of the function at point."
-  (let* ((src (buffer-string))
-	 (pt (point)))
+  (let ((src (buffer-string))
+	(pt (point)))
     (with-temp-buffer
       (insert src)
       (goto-char pt)
@@ -661,8 +661,8 @@ Return the result."
   (when (company-dcd--call-process-for-symbol-declaration)
     (let ((data (company-dcd--parse-output-for-get-symbol-declaration)))
       (if data
-	  (let* ((file (company-dcd--position-data-file data))
-		 (offset (company-dcd--position-data-offset data)))
+	  (let ((file (company-dcd--position-data-file data))
+		(offset (company-dcd--position-data-offset data)))
 	    (company-dcd--goto-def-push-marker)
 	    (unless (string=  file "stdin") ; the declaration is in the current file
 	      (find-file file))
@@ -810,10 +810,9 @@ Else, read query."
 
 (defun company-dcd--search-file-up (name &optional path)
   "Search for file NAME in parent directories recursively, starting with PATH (or `default-directory')."
-  (let* ((tags-file-name (concat path name))
-         (parent (company-dcd--parent-directory path))
-         (path (or path default-directory))
-         )
+  (let ((tags-file-name (concat path name))
+	(parent (company-dcd--parent-directory path))
+	(path (or path default-directory)))
     (cond
      ((file-exists-p tags-file-name) tags-file-name)
      ((string= parent path) nil)
@@ -821,7 +820,7 @@ Else, read query."
 
 (defun company-dcd--find-imports-dub ()
   "Extract import flags from \"dub describe\" output."
-  (let* ((basedir (fldd--get-project-dir)))
+  (let ((basedir (fldd--get-project-dir)))
     (if basedir
 	(mapcar (lambda (x) (concat "-I" x)) (fldd--get-dub-package-dirs))
       nil)))
