@@ -227,7 +227,7 @@ Returns the output from dcd-client, or nil if an error occurred."
 
 (defsubst company-dcd--cursor-position ()
   "Get the current cursor position to pass to dcd-client."
-  (position-bytes (point)))
+  (1- (position-bytes (point))))
 
 (defsubst company-dcd--build-args (&optional pos)
   "Build the argument list to pass to dcd-client.
