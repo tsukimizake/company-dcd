@@ -324,7 +324,8 @@ Used to display the argument list (calltips)."
     (annotation (format " %s" (company-dcd--get-help arg)))
     (meta (company-dcd--documentation arg))
     (post-completion (company-dcd--action arg))
-    (doc-buffer (company-dcd--get-completion-documentation arg))))
+    (doc-buffer (company-dcd--get-completion-documentation arg))
+    (location (company-dcd--get-completion-location arg))))
 
 
 ;; Function calltip expansion with yasnippet
@@ -667,6 +668,19 @@ Return the result."
 	      (find-file file))
 	    (goto-char (byte-to-position offset)))
 	(message "Not found")))))
+
+(defun company-dcd--get-completion-location (lastcompl)
+  "Company callback for opening the definition for a completion candidate."
+  (when (company-dcd--call-process-with-compl lastcompl "--symbolLocation")
+    (let ((data (company-dcd--parse-output-for-get-symbol-declaration)))
+      (when data
+	(let* ((file (company-dcd--position-data-file data))
+	       (offset (company-dcd--position-data-offset data))
+	       (buffer (if (string=  file "stdin")
+			   (current-buffer)
+			 (find-file-noselect file)))
+	       (position (with-current-buffer buffer (byte-to-position offset))))
+	  (cons buffer position))))))
 
 ;; Utilities for goto-definition
 
