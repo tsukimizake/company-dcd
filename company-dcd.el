@@ -829,36 +829,23 @@ Else, read query."
 	(mapcar (lambda (x) (concat "-I" x)) (fldd--get-dub-package-dirs))
       nil)))
 
-(defun company-dcd--find-imports-std ()
-  "Extract import flags from dmd.conf file."
-  (let ((dmd-conf-filename
-         (cl-find-if 'file-exists-p
-		     (list
-		      ;; TODO: the first directory to look into should be dmd's current
-		      ;; working dir
-		      (concat (getenv "HOME") "/dmd.conf")
-		      (concat (company-dcd--parent-directory (executable-find "dmd")) "dmd.conf")
-		      (concat (company-dcd--parent-directory
-                	(company-dcd--parent-directory
-                	(executable-find "dmd"))) "etc/dmd.conf")
-		      (concat (company-dcd--parent-directory
-                	(company-dcd--parent-directory
-                	(executable-find "dmd"))) "etc/dmd/dmd.conf")
-		      "/etc/dmd.conf"))))
+(defconst company-dcd--dmd-import-path-pattern
+  (rx bol "import path[" (one-or-more digit) "] = " (submatch (one-or-more not-newline)) eol))
 
-    ;; TODO: this extracting procedure is pretty rough, it just searches for
-    ;; the first occurrence of the DFLAGS
-    (save-window-excursion
-      (with-temp-buffer
-        (insert-file-contents dmd-conf-filename)
-        (goto-char (point-min))
-        (search-forward "\nDFLAGS")
-        (skip-chars-forward " =")
-        (let ((flags-list (split-string (buffer-substring-no-properties
-                                         (point) (line-end-position)))))
-          (cl-remove-if-not (lambda (s)
-			      (string-prefix-p "-I" s))
-			    flags-list))))))
+(defun company-dcd--find-imports-dmd ()
+  "Extract import flags from dmd configuration.
+
+This runs \"dmd company-dcd-nonexisting-file-test\", and reads DMD's search
+paths from stderr.
+
+This method avoids needing to find the correct dmd.conf and parsing it correctly."
+  (with-temp-buffer
+    (call-process "dmd" nil t nil "company-dcd-nonexisting-file-test")
+    (goto-char (point-min))
+    (let (lines)
+      (while (re-search-forward company-dcd--dmd-import-path-pattern nil t)
+	(push (concat "-I" (match-string-no-properties 1)) lines))
+      (nreverse lines))))
 
 (defun company-dcd--add-imports ()
   "Send import flags of the current DUB project to dcd-server.
@@ -869,7 +856,7 @@ or package.json file."
   (company-dcd--call-process
    (append
     (company-dcd--build-args)
-    (company-dcd--find-imports-std)
+    (company-dcd--find-imports-dmd)
     (company-dcd--find-imports-dub))))
 
 (defvar company-dcd-mode-map (make-keymap))
