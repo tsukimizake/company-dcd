@@ -97,19 +97,21 @@ If you need to restart the server, use `company-dcd-restart-server' instead."
   (interactive)
   (interrupt-process "dcd-server"))
 
-(defsubst company-dcd--start-server ()
+(defun company-dcd--start-server ()
   "Start dcd-server."
 
   (unless (executable-find company-dcd-server-executable)
     (error "company-dcd error: dcd-server not found"))
   
-  (let ((buf (get-buffer-create "*dcd-server*")))
-    (with-current-buffer buf (apply 'start-process "dcd-server" (current-buffer)
-				    company-dcd-server-executable
-				    "-p"
-				    (format "%s" company-dcd--server-port)
-				    company-dcd--flags
-				    ))))
+  (let (buf args proc)
+    (setq buf (get-buffer-create "*dcd-server*"))
+    (setq args (nconc (list company-dcd-server-executable
+			    "-p"
+			    (format "%s" company-dcd--server-port))
+		      company-dcd--flags))
+    (setq proc
+	  (with-current-buffer buf (apply 'start-process "dcd-server" (current-buffer) args)))
+    (set-process-query-on-exit-flag proc nil)))
 
 (defun company-dcd--server-is-alive-p ()
   "If dcd-server is alive, return t.  Otherwise, return nil."
