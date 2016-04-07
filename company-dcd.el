@@ -66,7 +66,7 @@ You can't put port number flag here.  Set `company-dcd--server-port' instead."
 
 (defconst company-dcd--error-buffer-name "*dcd-error*")
 (defconst company-dcd--output-buffer-name "*dcd-output*")
-(defconst company-dcd--document-buffer-name "*dcd-document*")
+(defconst company-dcd--documentation-buffer-name "*dcd-document*")
 (defcustom company-dcd-server-executable
   "dcd-server"
   "Location of dcd-server executable."
@@ -74,55 +74,58 @@ You can't put port number flag here.  Set `company-dcd--server-port' instead."
   :type 'file)
 
 (defcustom company-dcd--server-port 9166
-  "Port number of dcd-server.  default is 9166."
+  "Port number of dcd-server.  The default is 9166."
   :group 'company-dcd)
 
 (defvar company-dcd--delay-after-kill-process 200
-  "Duration after killing server process in milli second.
-If `company-dcd-restart-server' doesn't work correctly, please set bigger number for this variable.")
+  "Duration to wait after killing the server process, in milliseconds.
+If `company-dcd-restart-server' does not work correctly, please set this variable to a bigger number.")
 
 (defvar company-dcd--version nil
-  "Version of dcd server.  This variable is automatically set when company-dcd--get-version is called.")
+  "Version of dcd-server.  This variable is automatically set when company-dcd--get-version is called.")
 
 (defcustom company-dcd--ignore-template-argument nil
   "If non-nil, ignore template argument of calltip candidate."
   :group 'company-dcd)
 
-;;server handle functions
+;; Server management functions
 
 (defun company-dcd-stop-server ()
-  "Stop dcd-server manually.  Ordinary, you don't have to call it.
-If you want to restart server, use `company-dcd-restart-server' instead."
+  "Stop dcd-server manually.  You shouldn't need to call this function directly.
+
+If you need to restart the server, use `company-dcd-restart-server' instead."
   (interactive)
   (interrupt-process "dcd-server"))
 
-(defsubst company-dcd--start-server ()
+(defun company-dcd--start-server ()
   "Start dcd-server."
 
   (unless (executable-find company-dcd-server-executable)
-    (error "company-dcd error! dcd-server is not found."))
+    (error "company-dcd error: dcd-server not found"))
   
-  (let ((buf (get-buffer-create "*dcd-server*")))
-    (with-current-buffer buf (apply 'start-process "dcd-server" (current-buffer)
-				    company-dcd-server-executable
-				    "-p"
-				    (format "%s" company-dcd--server-port)
-				    company-dcd--flags
-				    ))))
+  (let (buf args proc)
+    (setq buf (get-buffer-create "*dcd-server*"))
+    (setq args (nconc (list company-dcd-server-executable
+			    "-p"
+			    (format "%s" company-dcd--server-port))
+		      company-dcd--flags))
+    (setq proc
+	  (with-current-buffer buf (apply 'start-process "dcd-server" (current-buffer) args)))
+    (set-process-query-on-exit-flag proc nil)))
 
 (defun company-dcd--server-is-alive-p ()
-  "If dcd-server is alive, return t.  Else, nil."
+  "If dcd-server is alive, return t.  Otherwise, return nil."
   (if (or (get-process "dcd-server") (not (zerop (string-to-number (shell-command-to-string "pidof dcd-server")))))
       t
     nil))
 
 (defun company-dcd-maybe-start-server ()
-  "Start dcd-server.  When the server process is already running, do nothing."
+  "Start dcd-server.  If the server process is already running, do nothing."
   (unless (company-dcd--server-is-alive-p)
     (company-dcd--start-server)))
 
 (defun company-dcd-restart-server ()
-  "Start dcd-server.  When the server process is already running, restart it."
+  "Start dcd-server.  If the server process is already running, restart it."
   (interactive)
   (when (company-dcd--server-is-alive-p)
     (company-dcd-stop-server)
@@ -131,23 +134,27 @@ If you want to restart server, use `company-dcd-restart-server' instead."
   (setq company-dcd--version nil))
 
 (defun company-dcd--get-version ()
-  "Get dcd version.  If company-dcd--version is set, use it as a cache."
+  "Get the version of dcd-server.  Cache the value to `company-dcd--version'."
   (if company-dcd--version
       company-dcd--version
     (progn
-      (company-dcd--call-process '("--version"))
-      (let* ((buf (get-buffer company-dcd--output-buffer-name))
-	     (str (with-current-buffer buf (buffer-string)))
-	     verstr)
+      (let ((str (company-dcd--call-process '("--version")))
+	    verstr)
+	(unless str
+	  (error "company-dcd error: Error obtaining dcd-server version"))
 	(string-match (rx "v" (submatch (* nonl)) (or "-" "\n")) str)
 	(setq verstr (match-string 1 str))
 	(setq company-dcd--version (string-to-number verstr))
 	))))
 
-;; output parser functions
+;; Output parsing functions
 
 (defun company-dcd--parse-output-for-completion ()
-  "Parse dcd output of normal completion."
+  "Parse dcd output from a completion query.
+
+Return a list of matches, where each match is a string,
+optionally with an attached `company-dcd--help' property
+containing the completion kind."
   (with-current-buffer company-dcd--output-buffer-name
     (goto-char (point-min))
     (let ((pattern company-dcd--completion-pattern)
@@ -163,15 +170,15 @@ If you want to restart server, use `company-dcd-restart-server' instead."
       lines)))
 
 (defun company-dcd--get-help (cand)
-  "Get type of candidate `CAND'."
+  "Get symbol kind of completion candidate CAND."
   (get-text-property 0 'company-dcd--help cand))
 
 (defvar company-dcd--error-message-regexp
   (rx (and (submatch (* nonl))  ": " (submatch (* nonl)) ": " (submatch (* nonl) eol)))
-  "If it matches first line of dcd-output, it would be error message.")
+  "If this regexp matches the first line of dcd-client output, it indicates an error message.")
 
 (defun company-dcd--handle-error (res args)
-  "Notify error with result RES and arguments ARGS."
+  "Display error message from a failed dcd-client invocation with exit code RES and arguments ARGS."
   (let* ((errbuf (get-buffer-create company-dcd--error-buffer-name))
          (outbuf (get-buffer company-dcd--output-buffer-name))
          (cmd (concat company-dcd-client-executable " " (mapconcat 'identity args " ")))
@@ -196,39 +203,47 @@ If you want to restart server, use `company-dcd-restart-server' instead."
   (with-current-buffer company-dcd--output-buffer-name
     (buffer-string)))
 
-;; utility functions to call process
+;; Utility functions for process invocation
+
 (defun company-dcd--call-process (args)
-  "Call dcd-client with ARGS.  Output string is inserted to dcd-output buf."
-  (let ((buf (get-buffer-create company-dcd--output-buffer-name))
-        res)
+  "Call dcd-client with ARGS and return output string.
+
+The current buffer's contents is passed to dcd-client via stdin.
+\(The entire buffer is sent, even if narrowed.\)
+
+Returns the output from dcd-client, or nil if an error occurred."
+  (let ((buf (get-buffer-create company-dcd--output-buffer-name)))
     (with-current-buffer buf (erase-buffer))
-    (setq res (if (null (executable-find company-dcd-client-executable))
-                  (progn
-                    (message "company-dcd error: could not find dcd-client executable")
-                    0)
-		(apply 'call-process-region (point-min) (point-max)
-		       company-dcd-client-executable nil buf nil args)))
-    (with-current-buffer buf
-      (unless (eq 0 res)
-        (company-dcd--handle-error res args))
-      )))
+    (if (executable-find company-dcd-client-executable)
+	;; Execute dcd-client, get error code
+	(let ((res (apply 'call-process-region 1 (1+ (buffer-size))
+			  company-dcd-client-executable nil buf nil args)))
+	  (with-current-buffer buf
+	    (if (eq 0 res)
+		(buffer-string)		; Return output
+	      (company-dcd--handle-error res args)
+	      nil)))
+
+      (message "company-dcd error: could not find dcd-client executable")
+      nil)))
 
 (defsubst company-dcd--cursor-position ()
-  "Get cursor position to pass to dcd-client."
-  (position-bytes (point)))
+  "Get the current cursor position to pass to dcd-client."
+  (1- (position-bytes (point))))
 
 (defsubst company-dcd--build-args (&optional pos)
-  "Build argument list to pass to dcd-client for position POS.
-If pos was not provided or nil, it will do what you mean."
+  "Build the argument list to pass to dcd-client.
+
+Optionally, pass POS as the --cursorPos argument if non-nil."
   (if pos 
       (list
-       "-c"
+       "--cursorPos"
        (format "%s" pos)
-       "-p"
+       "--port"
        (format "%s" company-dcd--server-port)
        )
     (list
-     "-p"
+     "--port"
      (format "%s" company-dcd--server-port)
      )))
 
@@ -236,58 +251,50 @@ If pos was not provided or nil, it will do what you mean."
   "Return non-nil if point is in a literal (a comment or string)."
   (nth 8 (syntax-ppss)))
 
-(defsubst company-dcd--adjust-cursor-on-completion (point)
-  "If it was not member completion, goto the head of query before call process.
-`POINT' is the point to complete in D src."
-
-  ;; I'm not sure if it is exactly 0.4. If the completion doesn't work on older dcd, please report.
-  (when (> 0.4 (company-dcd--get-version))
-    (return))
-  
-  (while (not (string-match (rx (or blank "." "\n")) (char-to-string (char-before (point)))))
-    (backward-char)))
-
 ;; Interface functions to company-mode.
+
 (defun company-dcd--get-candidates ()
-  "Get ordinary auto-complete candidates."
+  "Retrieve ordinary auto-completion candidates."
   (unless (company-dcd--in-string/comment)
-    (save-restriction
-      (widen)
-      (save-excursion
-	(company-dcd--adjust-cursor-on-completion (point))
-	(company-dcd--call-process
-	 (company-dcd--build-args (company-dcd--cursor-position))))
+    (when (company-dcd--call-process
+	   (company-dcd--build-args (company-dcd--cursor-position)))
       (company-dcd--parse-output-for-completion))))
 
-(defun company-dcd--document (item)
-  "Return popup document of `ITEM'."
-  (if (stringp item)
-      (let ((s (company-dcd--get-help item)))
-        (cond
-	 ((equal s "c") "class name")
-	 ((equal s "i") "interface name")
-	 ((equal s "s") "struct name")
-	 ((equal s "u") "union name")
-	 ((equal s "v") "variable name")
-	 ((equal s "m") "member variable name")
-	 ((equal s "k") "keyword, built-in version, scope statement")
-	 ((equal s "f") "function or method")
-	 ((equal s "g") "enum name")
-	 ((equal s "e") "enum member")
-	 ((equal s "P") "package name")
-	 ((equal s "M") "module name")
-	 ((equal s "a") "array")
-	 ((equal s "A") "associative array")
-	 ((equal s "l") "alias name")
-	 ((equal s "t") "template name")
-	 ((equal s "T") "mixin template name")
-         (t (format "candidate kind undetected: %s" s))
-         ))))
+(defun company-dcd--documentation (item)
+  "Return a short documentation string of ITEM.
 
-;; Q: Why run-with-timer?
-;; A: See https://github.com/company-mode/company-mode/issues/320
+This will be displayed in the mini-buffer when a completion candidate is
+highlighted.  Currently this returns a string describing the item's kind."
+  (when (stringp item)
+    (let ((s (company-dcd--get-help item)))
+      (cond
+       ;; https://github.com/Hackerpilot/DCD#completion-kinds
+       ((equal s "c") "class name")
+       ((equal s "i") "interface name")
+       ((equal s "s") "struct name")
+       ((equal s "u") "union name")
+       ((equal s "v") "variable name")
+       ((equal s "m") "member variable name")
+       ((equal s "k") "keyword / built-in version / scope statement")
+       ((equal s "f") "function or method")
+       ((equal s "g") "enum name")
+       ((equal s "e") "enum member")
+       ((equal s "P") "package name")
+       ((equal s "M") "module name")
+       ((equal s "a") "array")
+       ((equal s "A") "associative array")
+       ((equal s "l") "alias name")
+       ((equal s "t") "template name")
+       ((equal s "T") "mixin template name")
+       (t (format "Unknown candidate kind: %s" s))
+       ))))
+
 (defun company-dcd--action (lastcompl)
-  "Exec calltip expansion."
+  "Post-completion action callback.
+
+Used to display the argument list (calltips)."
+  ;; Q: Why run-with-timer?
+  ;; A: See https://github.com/company-mode/company-mode/issues/320
   (let ((candidate-type (company-dcd--get-help lastcompl)))
     (cond
      ((string= "f" candidate-type) ; when it was a function
@@ -299,50 +306,53 @@ If pos was not provided or nil, it will do what you mean."
       (run-with-idle-timer 0 nil (lambda ()
 				   (company-begin-backend 'company-dcd--calltips-for-struct-constructor)
 				   (let ((this-command 'company-idle-begin))
-				     (company-post-command))))
-      )
+				     (company-post-command)))))
      ((string= "c" candidate-type) ; when it was a class
       (run-with-idle-timer 0 nil (lambda ()
 				   (company-begin-backend 'company-dcd--calltips-for-struct-constructor)
 				   (let ((this-command 'company-idle-begin))
-				     (company-post-command))))
-      ))))
+				     (company-post-command)))))
+     )))
 
 (defvar company-dcd-mode nil)
 
 (defun company-dcd (command &optional arg &rest ignored)
-  "company-mode backend for DCD."
+  "The `company-mode' backend callback for DCD."
   (interactive (list 'interactive))
   (case command
     (interactive (company-begin-backend 'company-dcd))
     (prefix (and company-dcd-mode (company-grab-symbol)))
     (candidates (company-dcd--get-candidates))
     (annotation (format " %s" (company-dcd--get-help arg)))
-    (meta (company-dcd--document arg))
-    (post-completion (company-dcd--action arg))))
+    (meta (company-dcd--documentation arg))
+    (post-completion (company-dcd--action arg))
+    (doc-buffer (company-dcd--get-completion-documentation arg))
+    (location (company-dcd--get-completion-location arg))))
 
 
-;; function calltip expansion with yasnippet
+;; Function calltip expansion with yasnippet
 (defun company-dcd--get-calltip-candidates ()
-  "Return calltip completion candidates of the Dlang symbol at point.
-The cursor must be at the end of a Dlang symbol.
+  "Return calltip completion candidates for the D symbol at point.
+
+The cursor must be at the end of a D symbol.
 When the symbol is not a function, return nil."
   (let ((buf (get-buffer-create company-dcd--output-buffer-name)))
-    (company-dcd--call-process-for-calltips)
-    (with-current-buffer buf (company-dcd--parse-calltips))
-    ))
+    (when (company-dcd--call-process-for-calltips)
+      (with-current-buffer buf (company-dcd--parse-calltips)))))
 
 (defun company-dcd--call-process-for-calltips ()
   "Call process to get calltips of the function at point."
-  (insert "( ;")
-  (backward-char 2)
+  (let ((src (buffer-string))
+	(pt (point)))
+    (with-temp-buffer
+      (insert src)
+      (goto-char pt)
 
-  (company-dcd--call-process
-   (company-dcd--build-args (company-dcd--cursor-position)))
+      (insert "( ;")
+      (backward-char 2)
 
-  (forward-char 2)
-  (delete-char -3)
-  )
+      (company-dcd--call-process
+       (company-dcd--build-args (company-dcd--cursor-position))))))
 
 
 (defconst company-dcd--normal-calltip-pattern
@@ -360,9 +370,10 @@ When the symbol is not a function, return nil."
   :group 'company-dcd)
 
 (defsubst company-dcd--cleanup-function-candidate (s)
-  "This is a helper function for parser.
-Remove return type of the head of the function.
-`S' is candidate string."
+  "Helper function for parsing calltips.
+
+Remove the return type from the beginning of the function signature.
+S is the candidate string."
   (let (res)
     (with-temp-buffer
       (insert s)
@@ -384,16 +395,18 @@ Remove return type of the head of the function.
       )))
 
 (defsubst company-dcd--cleanup-template-candidate (s)
-  "This is a helper function for parser.
+  "Helper function for parsing calltips.
+
 Remove return type of the head of the template function.
-`S' is candidate string."
+S is the candidate string."
   (let (res)
     (with-temp-buffer
       (insert s)
 
-      ;;goto beggining of function name
+      ;; Go to beginning of function name
       (progn
-        (end-of-line)        (backward-sexp)
+        (end-of-line)
+        (backward-sexp)
 	(backward-sexp)
         (re-search-backward (rx (or bol " "))))
 
@@ -407,9 +420,10 @@ Remove return type of the head of the template function.
       res
       )))
 
-(defsubst company-dcd--candidate-is-tempalte-p (s)
-  "This is a helper function for parser.
-If candidate string `S' is a template, return t."
+(defsubst company-dcd--candidate-is-template-p (s)
+  "Helper function for parsing calltips.
+
+If candidate string S is a template, return t."
   (with-temp-buffer
     (insert s)
     (backward-sexp)
@@ -417,7 +431,8 @@ If candidate string `S' is a template, return t."
 
 (defun company-dcd--parse-calltips ()
   "Parse dcd output for calltip completion.
-It returns a list of calltip candidates."
+
+Returns a list of calltip candidates."
   (goto-char (point-min))
   (let ((pattern company-dcd--calltip-pattern)
         lines
@@ -425,7 +440,7 @@ It returns a list of calltip candidates."
 	)
     (while (re-search-forward pattern nil t)
       (setq match (match-string 0))
-      (if (company-dcd--candidate-is-tempalte-p match)
+      (if (company-dcd--candidate-is-template-p match)
 	  (progn
 	    (string-match company-dcd--template-pattern match)
 	    (add-to-list 'lines (company-dcd--cleanup-function-candidate (format "%s%s" (match-string 1 match) (match-string 3 match)))) ;remove template argument
@@ -441,11 +456,11 @@ It returns a list of calltip candidates."
     ))
 
 (defsubst company-dcd--format-calltips (str)
-  "Format calltips `STR' in parenthesis to yasnippet style."
+  "Format calltips STR in parenthesis to yasnippet style."
   (let (yasstr)
     
     ;;remove parenthesis
-    (setq str (substring str 1 (- (length str) 1)))
+    (setq str (substring str 1 (1- (length str))))
 
     (setq yasstr
 	  (mapconcat
@@ -456,14 +471,14 @@ It returns a list of calltip candidates."
     ))
 
 (defun company-dcd--calltip-action (lastcompl)
-  "Format and insert the calltip using yasnippet.
+  "Post-completion callback: format and insert the calltip using yasnippet.
 This function should be called at *dcd-output* buf."
   (let* ((end (point))
 	 (arg-beg (save-excursion
 		    (backward-sexp)
 		    (point)))
 	 (template-beg
-	  (if (company-dcd--candidate-is-tempalte-p lastcompl)
+	  (if (company-dcd--candidate-is-template-p lastcompl)
 	      (save-excursion
 		(backward-sexp 2)
 		(point))
@@ -485,7 +500,7 @@ This function should be called at *dcd-output* buf."
     nil))
 
 (defun company-dcd--calltips (command &optional arg &rest ignored)
-  "dcd calltip completion."
+  "Company \"backend\" for DCD calltip completion."
   (interactive (list 'interactive))
   (case command
     (interactive (company-begin-backend 'company-dcd--calltips))
@@ -494,9 +509,10 @@ This function should be called at *dcd-output* buf."
      (company-dcd--get-calltip-candidates)
      )
     (post-completion (company-dcd--calltip-action arg))
-    ))
+    (doc-buffer (company-dcd--get-completion-documentation arg))
+    (location (company-dcd--get-completion-location arg))))
 
-;; struct constructor calltip expansion
+;; Struct constructor calltip expansion
 
 (defsubst company-dcd--replace-this-to-struct-name (struct-name)
   "Replace \"this\" with STRUCT-NAME.
@@ -515,7 +531,7 @@ dcd-client outputs candidates which begin with \"this\" when completing struct c
     ))
 
 (defun company-dcd--calltips-for-struct-constructor (command &optional arg &rest ignored)
-  "dcd calltip completion for struct constructor."
+  "Company \"backend\" for DCD struct/class constructor calltip completion."
   (interactive (list 'interactive))
   (case command
     (interactive (company-begin-backend 'company-dcd--calltips))
@@ -523,17 +539,20 @@ dcd-client outputs candidates which begin with \"this\" when completing struct c
     (candidates
      (company-dcd--get-calltip-candidate-for-struct-constructor arg))
     (post-completion (company-dcd--calltip-action arg))
-    ))
+    (doc-buffer (company-dcd--get-completion-documentation arg))
+    (location (company-dcd--get-completion-location arg))))
 
 
-;;show document
+;; Documentation display
 
-(defun company-dcd--reformat-document ()
-  "Currently, it just unescape \n and \\n."
-  (with-current-buffer (get-buffer company-dcd--document-buffer-name)
+(defun company-dcd--reformat-documentation ()
+  "Prepare a documentation string for display.
 
-    ;; replace '\n' with newline
-    ;;doit twice to catch '\n\n'
+Currently, it simply unescapes \n and \\n."
+  (with-current-buffer (get-buffer company-dcd--documentation-buffer-name)
+
+    ;; Replace '\n' with newline.
+    ;; Do it twice to catch '\n\n'.
     (goto-char (point-min))
     (while (re-search-forward (rx (and (not (any "\\")) (submatch "\\n"))) nil t)
       (replace-match "\n" nil nil nil 1))
@@ -542,7 +561,7 @@ dcd-client outputs candidates which begin with \"this\" when completing struct c
     (while (re-search-forward (rx (and (not (any "\\")) (submatch "\\n"))) nil t)
       (replace-match "\n" nil nil nil 1))
 
-    ;; replace '\\n' in D src to '\n'
+    ;; Replace '\\n' in D src with '\n'
     (goto-char (point-min))
     (while (re-search-forward (rx "\\\\n") nil t)
       (replace-match "\\\\n"))
@@ -550,39 +569,71 @@ dcd-client outputs candidates which begin with \"this\" when completing struct c
     ))
 
 (defun company-dcd--get-ddoc ()
-  "Get document with `dcd-client --doc'."
-  (save-buffer)
+  "Retrieve symbol documentation using \"dcd-client --doc\".
+
+Return nil on error or if the symbol is not documented."
   (let ((args
          (append
           (company-dcd--build-args (company-dcd--cursor-position))
-          '("-d")
-          (list (buffer-file-name))))
-        )
+          '("--doc"))))
 
-    (with-current-buffer (get-buffer-create company-dcd--output-buffer-name)
-      (erase-buffer)
-      (company-dcd--call-process args)
-      (when (or
-	     (string= (buffer-string) "\n\n\n")	; when symbol has no doc
-	     (string= (buffer-string) "") ; when there is no symbol at cursor, or something.
-	     )
-	(error "No document for the symbol at point!"))
-      (buffer-string))
-    ))
+      (let ((result (company-dcd--call-process args)))
+	(when (and
+	       result			; invocation succeeded
+	       (string-match (rx (not (syntax whitespace)))
+			     result))	; result not empty (contains non-whitespace)
+	  result))))
 
 (defun company-dcd-show-ddoc-with-buffer ()
-  "Display Ddoc at point using `display-buffer'."
+  "Display Ddoc of symbol at point using `display-buffer'."
   (interactive)
 
   (let ((raw-doc (company-dcd--get-ddoc)))
-    (with-current-buffer (get-buffer-create company-dcd--document-buffer-name)
-      (insert raw-doc)))
-  (company-dcd--reformat-document)
-  (display-buffer (get-buffer-create company-dcd--document-buffer-name)))
+    (if raw-doc
+	(progn
+	  (with-current-buffer (get-buffer-create company-dcd--documentation-buffer-name)
+	    (insert raw-doc))
+	  (company-dcd--reformat-documentation)
+	  (display-buffer (get-buffer-create company-dcd--documentation-buffer-name)))
+      (message "No documentation for the symbol at point."))))
 
 
-;; goto definition
-;; thanks to jedi.el by Takafumi Arakaki
+(defun company-dcd--call-process-with-compl (lastcompl switch)
+  "Call dcd-client with a hypothetically-expanded completion candidate.
+
+Create a temporary buffer, which is a copy of the current buffer but with
+LASTCOMPL expanded.  Execute DCD with the additional parameter SWITCH.
+Return the result."
+  (let ((src (buffer-string))
+	(pt (point)))
+    (with-temp-buffer
+      (insert src)
+      (goto-char pt)
+
+      (delete-char (- 0 (length (company-grab-symbol))))
+      (save-excursion
+	(insert lastcompl))
+      (forward-char)
+
+      (company-dcd--call-process
+         (append
+          (company-dcd--build-args (company-dcd--cursor-position))
+          (list switch))))))
+
+(defun company-dcd--get-completion-documentation (lastcompl)
+  "Company callback for displaying the documentation for a completion candidate."
+  (let ((raw-doc (company-dcd--call-process-with-compl lastcompl "--doc")))
+    (when raw-doc
+      (company-doc-buffer
+       (with-current-buffer (get-buffer-create company-dcd--documentation-buffer-name)
+	 (erase-buffer)
+	 (insert raw-doc)
+	 (company-dcd--reformat-documentation)
+	 (buffer-string))))))
+
+
+;; Go to definition
+;; Thanks to jedi.el by Takafumi Arakaki
 
 (defcustom company-dcd--goto-definition-marker-ring-length 16
   "Length of marker ring to store `company-dcd-goto-definition' call positions."
@@ -600,7 +651,7 @@ dcd-client outputs candidates which begin with \"this\" when completing struct c
   "Goto the point where `company-dcd-goto-definition' was last called."
   (interactive)
   (if (ring-empty-p company-dcd--goto-definition-marker-ring)
-      (error "Marker ring is empty. Can't pop.")
+      (error "Marker ring is empty, can't pop")
     (let ((marker (ring-remove company-dcd--goto-definition-marker-ring 0)))
       (switch-to-buffer (or (marker-buffer marker)
                             (error "Buffer has been deleted")))
@@ -613,38 +664,53 @@ dcd-client outputs candidates which begin with \"this\" when completing struct c
 (defun company-dcd-goto-definition ()
   "Goto declaration of symbol at point."
   (interactive)
-  (save-buffer)
-  (company-dcd--call-process-for-symbol-declaration)
-  (let ((data (company-dcd--parse-output-for-get-symbol-declaration)))
-    (if data
+  (when (company-dcd--call-process-for-symbol-declaration)
+    (let ((data (company-dcd--parse-output-for-get-symbol-declaration)))
+      (if data
+	  (let ((file (company-dcd--position-data-file data))
+		(offset (company-dcd--position-data-offset data)))
+	    (company-dcd--goto-def-push-marker)
+	    (unless (string=  file "stdin") ; the declaration is in the current file
+	      (find-file file))
+	    (goto-char (byte-to-position offset)))
+	(message "Not found")))))
+
+(defun company-dcd--get-completion-location (lastcompl)
+  "Company callback for opening the definition for a completion candidate."
+  (when (company-dcd--call-process-with-compl lastcompl "--symbolLocation")
+    (let ((data (company-dcd--parse-output-for-get-symbol-declaration)))
+      (when data
 	(let* ((file (company-dcd--position-data-file data))
-	       (offset (company-dcd--position-data-offset data)))
-	  (company-dcd--goto-def-push-marker)
-	  (unless (string=  file "stdin") ; the declaration is in the current file
-	    (find-file file))
-	  (goto-char (byte-to-position offset)))
-      (message "Not found"))))
+	       (offset (company-dcd--position-data-offset data))
+	       (buffer (if (string=  file "stdin")
+			   (current-buffer)
+			 (find-file-noselect file)))
+	       (position (with-current-buffer buffer (byte-to-position offset))))
+	  (cons buffer position))))))
 
+;; Utilities for goto-definition
 
-;; utilities for goto-definition
+(defun company-dcd--word-char-p (char)
+  "Return t if CHAR is a D word char (part of an identifier), nil otherwise."
+  (member (char-syntax char) '(?w ?_)))
 
 (defun company-dcd--call-process-for-symbol-declaration ()
   "Call process for `dcd-client --symbolLocation'."
-  (let ((args
-         (append
-          (company-dcd--build-args (company-dcd--cursor-position))
-          '("-l")
-          (list (buffer-file-name))))
-        (buf (get-buffer-create company-dcd--output-buffer-name)))
-    (with-current-buffer buf
-      (erase-buffer)
-      (company-dcd--call-process args)
-      (buffer-string)
-      )))
+  (let ((pos (company-dcd--cursor-position)))
+
+    ;; Work around https://github.com/Hackerpilot/DCD/issues/98
+    (when (and
+	   (not (company-dcd--word-char-p (char-before (point))))
+	   (company-dcd--word-char-p (char-after (point))))
+      (setq pos (1+ pos)))
+
+    (company-dcd--call-process
+     (append (company-dcd--build-args pos) '("--symbolLocation")))))
 
 (defun company-dcd--parse-output-for-get-symbol-declaration ()
   "Parse output of `company-dcd--get-symbol-declaration'.
-output is a company-dcd--position-data, whose `type' is nil."
+
+Output is a `company-dcd--position-data', whose `type' is nil."
   (let ((buf (get-buffer-create company-dcd--output-buffer-name)))
     (with-current-buffer buf
       (goto-char (point-min))
@@ -656,7 +722,7 @@ output is a company-dcd--position-data, whose `type' is nil."
         nil))
     ))
 
-;;; symbol search.
+;;; Symbol search.
 
 (defvar company-dcd--symbol-search-pattern
   (rx (and bol (submatch (* nonl)) "\t" (submatch char) "\t" (submatch (* digit)) eol))
@@ -677,21 +743,21 @@ output is a company-dcd--position-data, whose `type' is nil."
       res)))
 
 (defun company-dcd--call-process-for-symbol-search (str)
-  "Call DCD process to search symbol."
+  "Invoke dcd-client to find symbol STR."
   (let ((args
          (append
           (company-dcd--build-args)
-          '("-s")
+          '("--search")
 	  (list str))))
     
-    (with-current-buffer (get-buffer-create company-dcd--output-buffer-name)
-      (company-dcd--call-process args))))
+      (company-dcd--call-process args)))
 
 (defun company-dcd-symbol-search (str)
-  "Search symbol using DCD with query `STR'.
-Return a list of `company-dcd--position-data'."
-  (company-dcd--call-process-for-symbol-search str)
-  (company-dcd--parse-output-for-symbol-search))
+  "Search symbol using DCD with query STR.
+
+Return a list of `company-dcd--position-data' structs."
+  (when (company-dcd--call-process-for-symbol-search str)
+    (company-dcd--parse-output-for-symbol-search)))
 
 (defun company-dcd--find-file-of-pos-data (pos-data)
   (find-file-noselect (company-dcd--position-data-file pos-data)))
@@ -706,9 +772,7 @@ Return a list of `company-dcd--position-data'."
 
 
 (defun company-dcd--format-helm-dcd-search-result (pos-data)
-  "Format `POS-DATA' to helm's file-line candidate style."
-  
-  
+  "Convert POS-DATA (a `company-dcd--position-data' struct) to helm's file-line candidate style."
   
   (with-current-buffer (company-dcd--find-file-of-pos-data pos-data)
     (company-dcd--goto-char-of-pos-data pos-data)
@@ -743,8 +807,7 @@ Else, read query."
   (helm 'helm-c-source-company-dcd-search)
   (recenter))
 
-
-;;; automatic add-imports.
+;;; Automatic import path detection.
 
 (defun company-dcd--parent-directory (dir)
   "Return parent directory of DIR."
@@ -752,11 +815,10 @@ Else, read query."
     (file-name-directory (directory-file-name (expand-file-name dir)))))
 
 (defun company-dcd--search-file-up (name &optional path)
-  "Search for file NAME in parent directories recursively."
-  (let* ((tags-file-name (concat path name))
-         (parent (company-dcd--parent-directory path))
-         (path (or path default-directory))
-         )
+  "Search for file NAME in parent directories recursively, starting with PATH (or `default-directory')."
+  (let ((tags-file-name (concat path name))
+	(parent (company-dcd--parent-directory path))
+	(path (or path default-directory)))
     (cond
      ((file-exists-p tags-file-name) tags-file-name)
      ((string= parent path) nil)
@@ -764,41 +826,28 @@ Else, read query."
 
 (defun company-dcd--find-imports-dub ()
   "Extract import flags from \"dub describe\" output."
-  (let* ((basedir (fldd--get-project-dir)))
+  (let ((basedir (fldd--get-project-dir)))
     (if basedir
 	(mapcar (lambda (x) (concat "-I" x)) (fldd--get-dub-package-dirs))
       nil)))
 
-(defun company-dcd--find-imports-std ()
-  "Extract import flags from dmd.conf file."
-  (let ((dmd-conf-filename
-         (cl-find-if 'file-exists-p
-		     (list
-		      ;; TODO: the first directory to look into should be dmd's current
-		      ;; working dir
-		      (concat (getenv "HOME") "/dmd.conf")
-		      (concat (company-dcd--parent-directory (executable-find "dmd")) "dmd.conf")
-		      (concat (company-dcd--parent-directory
-                	(company-dcd--parent-directory
-                	(executable-find "dmd"))) "etc/dmd.conf")
-		      (concat (company-dcd--parent-directory
-                	(company-dcd--parent-directory
-                	(executable-find "dmd"))) "etc/dmd/dmd.conf")
-		      "/etc/dmd.conf"))))
+(defconst company-dcd--dmd-import-path-pattern
+  (rx bol "import path[" (one-or-more digit) "] = " (submatch (one-or-more not-newline)) eol))
 
-    ;; TODO: this extracting procedure is pretty rough, it just searches for
-    ;; the first occurrence of the DFLAGS
-    (save-window-excursion
-      (with-temp-buffer
-        (insert-file-contents dmd-conf-filename)
-        (goto-char (point-min))
-        (search-forward "\nDFLAGS")
-        (skip-chars-forward " =")
-        (let ((flags-list (split-string (buffer-substring-no-properties
-                                         (point) (line-end-position)))))
-          (cl-remove-if-not (lambda (s)
-			      (string-prefix-p "-I" s))
-			    flags-list))))))
+(defun company-dcd--find-imports-dmd ()
+  "Extract import flags from dmd configuration.
+
+This runs \"dmd company-dcd-nonexisting-file-test\", and reads DMD's search
+paths from stderr.
+
+This method avoids needing to find the correct dmd.conf and parsing it correctly."
+  (with-temp-buffer
+    (call-process "dmd" nil t nil "company-dcd-nonexisting-file-test")
+    (goto-char (point-min))
+    (let (lines)
+      (while (re-search-forward company-dcd--dmd-import-path-pattern nil t)
+	(push (concat "-I" (match-string-no-properties 1)) lines))
+      (nreverse lines))))
 
 (defun company-dcd--add-imports ()
   "Send import flags of the current DUB project to dcd-server.
@@ -809,7 +858,7 @@ or package.json file."
   (company-dcd--call-process
    (append
     (company-dcd--build-args)
-    (company-dcd--find-imports-std)
+    (company-dcd--find-imports-dmd)
     (company-dcd--find-imports-dub))))
 
 (defvar company-dcd-mode-map (make-keymap))
@@ -832,7 +881,7 @@ or package.json file."
 	     (add-to-list 'popwin:special-display-config
 			  `(,company-dcd--error-buffer-name :noselect t))
 	     (add-to-list 'popwin:special-display-config
-			  `(,company-dcd--document-buffer-name :position right :width 80)))
+			  `(,company-dcd--documentation-buffer-name :position right :width 80)))
     ))
 
 (provide 'company-dcd)
