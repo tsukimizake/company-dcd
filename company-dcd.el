@@ -68,9 +68,11 @@ You can't put port number flag here.  Set `company-dcd--server-port' instead."
   "Regex to parse dcd output.
 \\1 is candidate itself, \\2 is kind of candidate.")
 
+(defconst company-dcd--server-buffer-name "*dcd-server*")
 (defconst company-dcd--error-buffer-name "*dcd-error*")
 (defconst company-dcd--output-buffer-name "*dcd-output*")
 (defconst company-dcd--documentation-buffer-name "*dcd-document*")
+
 (defcustom company-dcd-server-executable
   "dcd-server"
   "Location of dcd-server executable."
@@ -108,7 +110,7 @@ If you need to restart the server, use `company-dcd-restart-server' instead."
     (error "company-dcd error: dcd-server not found"))
   
   (let (buf args proc)
-    (setq buf (get-buffer-create "*dcd-server*"))
+    (setq buf (get-buffer-create company-dcd--server-buffer-name))
     (setq args (nconc (list company-dcd-server-executable
 			    "-p"
 			    (format "%s" company-dcd--server-port))
