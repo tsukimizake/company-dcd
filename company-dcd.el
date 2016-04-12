@@ -237,21 +237,19 @@ Returns the output from dcd-client, or nil if an error occurred."
   "Get the current cursor position to pass to dcd-client."
   (1- (position-bytes (point))))
 
-(defsubst company-dcd--build-args (&optional pos)
+(defun company-dcd--build-args (&optional pos)
   "Build the argument list to pass to dcd-client.
 
 Optionally, pass POS as the --cursorPos argument if non-nil."
-  (if pos 
-      (list
-       "--cursorPos"
-       (format "%s" pos)
-       "--port"
-       (format "%s" company-dcd--server-port)
-       )
-    (list
-     "--port"
-     (format "%s" company-dcd--server-port)
-     )))
+  (nconc
+   (list
+    "--port"
+    (format "%s" company-dcd--server-port))
+   (when pos
+     (list
+      (concat "-I" default-directory)
+      "--cursorPos"
+      (format "%s" pos)))))
 
 (defsubst company-dcd--in-string/comment ()
   "Return non-nil if point is in a literal (a comment or string)."
