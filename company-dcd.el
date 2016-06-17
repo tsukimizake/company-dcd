@@ -547,25 +547,18 @@ dcd-client outputs candidates which begin with \"this\" when completing struct c
 
 (defun company-dcd--reformat-documentation ()
   "Prepare a documentation string for display.
-
-Currently, it simply unescapes \n and \\n."
+Currently, it simply unescapes `\\n' unless it's in $(D ...) closure."
   (with-current-buffer (get-buffer company-dcd--documentation-buffer-name)
-
-    ;; Replace '\n' with newline.
-    ;; Do it twice to catch '\n\n'.
     (goto-char (point-min))
-    (while (re-search-forward (rx (and (not (any "\\")) (submatch "\\n"))) nil t)
-      (replace-match "\n" nil nil nil 1))
-
-    (goto-char (point-min))
-    (while (re-search-forward (rx (and (not (any "\\")) (submatch "\\n"))) nil t)
-      (replace-match "\n" nil nil nil 1))
-
-    ;; Replace '\\n' in D src with '\n'
-    (goto-char (point-min))
-    (while (re-search-forward (rx "\\\\n") nil t)
-      (replace-match "\\\\n"))
-    (goto-char (point-min))
+    (while (not (equal (point) (point-max)))
+      (cond
+       ((looking-at (rx "\\n"))
+	(delete-char 2)
+	(insert "\n"))
+       ((looking-at (rx "$(")) ; skip D expr.
+	(forward-sexp 2))
+       )
+      (forward-char))
     ))
 
 (defun company-dcd--get-ddoc ()
@@ -587,11 +580,11 @@ Return nil on error or if the symbol is not documented."
 (defun company-dcd-show-ddoc-with-buffer ()
   "Display Ddoc of symbol at point using `display-buffer'."
   (interactive)
-
   (let ((raw-doc (company-dcd--get-ddoc)))
     (if raw-doc
 	(progn
 	  (with-current-buffer (get-buffer-create company-dcd--documentation-buffer-name)
+	    (erase-buffer)
 	    (insert raw-doc))
 	  (company-dcd--reformat-documentation)
 	  (display-buffer (get-buffer-create company-dcd--documentation-buffer-name)))
