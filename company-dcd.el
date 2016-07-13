@@ -2,7 +2,7 @@
 
 ;; Author: tsukimizake <shomasd_at_gmail.com>
 ;; Version: 0.1
-;; Package-Requires: ((company "0.9") (flycheck-dmd-dub "0.7") (yasnippet "0.8") (popwin "0.7") (cl-lib "0.5") (helm "1.5.6"))
+;; Package-Requires: ((company "0.9") (flycheck-dmd-dub "0.7") (yasnippet "0.8") (popwin "0.7") (cl-lib "0.5"))
 ;; Keywords: languages
 ;; URL: http://github.com/tsukimizake/company-dcd
 
@@ -40,8 +40,6 @@
 (require 'ring)
 (require 'cl-lib)
 (require 'popwin)
-(require 'helm)
-(require 'company-dcd-helm-file-type)
 
 (defgroup company-dcd nil "company-mode backend for DCD." :group 'company)
 
@@ -764,41 +762,12 @@ Return a list of `company-dcd--position-data' structs."
       (buffer-substring-no-properties beg end)))
 
 
-(defun company-dcd--format-helm-dcd-search-result (pos-data)
-  "Convert POS-DATA (a `company-dcd--position-data' struct) to helm's file-line candidate style."
-  
-  (with-current-buffer (company-dcd--find-file-of-pos-data pos-data)
-    (company-dcd--goto-char-of-pos-data pos-data)
-    (let ((fname (company-dcd--position-data-file pos-data))
-	  (line (line-number-at-pos))
-	  (str (company-dcd--line-string-at-pos)))
-      
-      (format "%s:%s:%s" fname line str))))
-
 (defun company-dcd--read-query-or-region-str ()
   "If region is active, return the region string.
 Else, read query."
   (if (region-active-p)
       (buffer-substring-no-properties (region-beginning) (region-end))
       (read-string "query: ")))
-
-(defvar helm-c-source-company-dcd-search
-  '(
-    (name . "dcd-search")
-    (init . (lambda ()
-	      (let* ((query (company-dcd--read-query-or-region-str))
-		     (res (company-dcd-symbol-search query)))
-		(with-current-buffer (helm-candidate-buffer 'local)
-		  (insert (mapconcat 'company-dcd--format-helm-dcd-search-result res "\n"))))))
-    (candidates-in-buffer)
-    (type . company-dcd-file-line)))
-
-(defun company-dcd-helm-search-symbol ()
-  "DCD symbol search with helm interface."
-  (interactive)
-  (company-dcd--goto-def-push-marker)
-  (helm 'helm-c-source-company-dcd-search)
-  (recenter))
 
 ;;; Automatic import path detection.
 
@@ -858,7 +827,6 @@ or package.json file."
 (define-key company-dcd-mode-map (kbd "C-c ?") 'company-dcd-show-ddoc-with-buffer)
 (define-key company-dcd-mode-map (kbd "C-c .") 'company-dcd-goto-definition)
 (define-key company-dcd-mode-map (kbd "C-c ,") 'company-dcd-goto-def-pop-marker)
-(define-key company-dcd-mode-map (kbd "C-c s") 'company-dcd-helm-search-symbol)
 
 ;;;###autoload
 (define-minor-mode company-dcd-mode "company-backend for Dlang Completion Demon, aka DCD."

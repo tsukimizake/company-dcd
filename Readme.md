@@ -25,7 +25,7 @@ Keybinds
 
 * Show ddoc with `C-c ?`
 * Goto definition with `C-c .`
-* Search symbol with `C-c s` (If region is active, search for the region string.)
+* Search symbol with `C-c s` (If region is active, search for the region string.) (Temporary unavailable.)
 * After goto definition or search symbol, you can pop to previous position with `C-c ,`
 
 Known issues
