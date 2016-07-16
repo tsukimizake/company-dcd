@@ -28,7 +28,7 @@ Keybinds
 * Search symbol with `C-c s` (If region is active, search for the region string.) (Temporary unavailable.)
 * After goto definition or search symbol, you can pop to previous position with `C-c ,`
 
-Known issues
+About issues and questions
 ------------
 
-None. If you find something curious, fell free to create an issue.
+If you find something curious, fell free to create an issue.
