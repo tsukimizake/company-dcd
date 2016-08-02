@@ -317,7 +317,7 @@ Used to display the argument list (calltips)."
 (defun company-dcd (command &optional arg &rest ignored)
   "The `company-mode' backend callback for DCD."
   (interactive (list 'interactive))
-  (case command
+  (cl-case command
     (interactive (company-begin-backend 'company-dcd))
     (prefix (and company-dcd-mode (company-grab-symbol)))
     (candidates (company-dcd--get-candidates))
@@ -500,7 +500,7 @@ This function should be called at *dcd-output* buf."
 (defun company-dcd--calltips (command &optional arg &rest ignored)
   "Company \"backend\" for DCD calltip completion."
   (interactive (list 'interactive))
-  (case command
+  (cl-case command
     (interactive (company-begin-backend 'company-dcd--calltips))
     (prefix (company-dcd--calltip-completion-available))
     (candidates
@@ -531,7 +531,7 @@ dcd-client outputs candidates which begin with \"this\" when completing struct c
 (defun company-dcd--calltips-for-struct-constructor (command &optional arg &rest ignored)
   "Company \"backend\" for DCD struct/class constructor calltip completion."
   (interactive (list 'interactive))
-  (case command
+  (cl-case command
     (interactive (company-begin-backend 'company-dcd--calltips))
     (prefix (company-dcd--calltip-completion-available))
     (candidates
