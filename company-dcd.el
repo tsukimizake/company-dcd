@@ -856,6 +856,7 @@ or package.json file."
 (define-key company-dcd-mode-map (kbd "C-c ?") 'company-dcd-show-ddoc-with-buffer)
 (define-key company-dcd-mode-map (kbd "C-c .") 'company-dcd-goto-definition)
 (define-key company-dcd-mode-map (kbd "C-c ,") 'company-dcd-goto-def-pop-marker)
+(define-key company-dcd-mode-map (kbd "C-c s") 'company-dcd-ivy-search-symbol)
 
 ;;;###autoload
 (define-minor-mode company-dcd-mode "company-backend for Dlang Completion Demon, aka DCD."
