@@ -2,7 +2,7 @@
 
 ;; Author: tsukimizake <shomasd_at_gmail.com>
 ;; Version: 0.1
-;; Package-Requires: ((company "0.9") (flycheck-dmd-dub "0.7") (yasnippet "0.8") (popwin "0.7") (cl-lib "0.5"))
+;; Package-Requires: ((company "0.9") (flycheck-dmd-dub "0.7") (yasnippet "0.8") (popwin "0.7") (cl-lib "0.5") (ivy "20160804.326"))
 ;; Keywords: languages
 ;; URL: http://github.com/tsukimizake/company-dcd
 
@@ -40,7 +40,7 @@
 (require 'ring)
 (require 'cl-lib)
 (require 'popwin)
-
+(require 'ivy)
 (defgroup company-dcd nil "company-mode backend for DCD." :group 'company)
 
 (defcustom company-dcd-client-executable
@@ -568,12 +568,12 @@ Return nil on error or if the symbol is not documented."
           (company-dcd--build-args (company-dcd--cursor-position))
           '("--doc"))))
 
-      (let ((result (company-dcd--call-process args)))
-	(when (and
-	       result			; invocation succeeded
-	       (string-match (rx (not (syntax whitespace)))
-			     result))	; result not empty (contains non-whitespace)
-	  result))))
+    (let ((result (company-dcd--call-process args)))
+      (when (and
+	     result			; invocation succeeded
+	     (string-match (rx (not (syntax whitespace)))
+			   result))	; result not empty (contains non-whitespace)
+	result))))
 
 (defun company-dcd-show-ddoc-with-buffer ()
   "Display Ddoc of symbol at point using `display-buffer'."
@@ -607,9 +607,9 @@ Return the result."
       (forward-char)
 
       (company-dcd--call-process
-         (append
-          (company-dcd--build-args (company-dcd--cursor-position))
-          (list switch))))))
+       (append
+	(company-dcd--build-args (company-dcd--cursor-position))
+	(list switch))))))
 
 (defun company-dcd--get-completion-documentation (lastcompl)
   "Company callback for displaying the documentation for a completion candidate."
@@ -740,15 +740,32 @@ Output is a `company-dcd--position-data', whose `type' is nil."
           (company-dcd--build-args)
           '("--search")
 	  (list str))))
-    
-      (company-dcd--call-process args)))
+    (company-dcd--call-process args)))
 
-(defun company-dcd-symbol-search (str)
+(defun company-dcd--symbol-search (str)
   "Search symbol using DCD with query STR.
 
 Return a list of `company-dcd--position-data' structs."
   (when (company-dcd--call-process-for-symbol-search str)
     (company-dcd--parse-output-for-symbol-search)))
+
+(defun company-dcd--pos-data-to-ivy-candidate-string (pos-data)
+  (with-current-buffer (company-dcd--find-file-of-pos-data pos-data)
+    (company-dcd--goto-char-of-pos-data pos-data)
+    (let ((line-string (company-dcd--line-string-at-pos)))
+  (format "%s:%s:%s\n%s"
+	  (company-dcd--position-data-file pos-data)
+	  (company-dcd--position-data-type pos-data)
+	  (company-dcd--position-data-offset pos-data)
+	  line-string)
+  )))
+
+(defun company-dcd--ivy-candidate-string-to-pos-data (str)
+  (string-match (rx (submatch (* nonl)) ":" (submatch (* nonl)) ":" (submatch (* nonl)) "\n" (* nonl)) str)
+  (let ((file (match-string 1 str))
+	(type (match-string 2 str))
+	(offset (string-to-number (match-string 3 str))))
+    (make-company-dcd--position-data :file file :type type :offset offset)))
 
 (defun company-dcd--find-file-of-pos-data (pos-data)
   (find-file-noselect (company-dcd--position-data-file pos-data)))
@@ -757,9 +774,9 @@ Return a list of `company-dcd--position-data' structs."
   (goto-char (byte-to-position (company-dcd--position-data-offset pos-data))))
 
 (defun company-dcd--line-string-at-pos ()
-    (let ((beg (point-at-bol))
-	  (end (point-at-eol)))
-      (buffer-substring-no-properties beg end)))
+  (let ((beg (point-at-bol))
+	(end (point-at-eol)))
+    (buffer-substring-no-properties beg end)))
 
 
 (defun company-dcd--read-query-or-region-str ()
@@ -767,7 +784,19 @@ Return a list of `company-dcd--position-data' structs."
 Else, read query."
   (if (region-active-p)
       (buffer-substring-no-properties (region-beginning) (region-end))
-      (read-string "query: ")))
+    (read-string "Query: ")))
+
+(defun company-dcd-ivy-search-symbol ()
+  (interactive)
+  (let* ((ivy-format-function 'ivy-format-function-arrow)
+	 (query (company-dcd--read-query-or-region-str))
+	 (candidates (company-dcd--symbol-search query))
+	 (candidates-strlist (mapcar 'company-dcd--pos-data-to-ivy-candidate-string candidates))
+	 (res (company-dcd--ivy-candidate-string-to-pos-data (ivy-read "Search: " candidates-strlist))))
+    (company-dcd--goto-def-push-marker)
+    (switch-to-buffer (company-dcd--find-file-of-pos-data res))
+    (company-dcd--goto-char-of-pos-data res)
+    ))
 
 ;;; Automatic import path detection.
 
@@ -827,6 +856,7 @@ or package.json file."
 (define-key company-dcd-mode-map (kbd "C-c ?") 'company-dcd-show-ddoc-with-buffer)
 (define-key company-dcd-mode-map (kbd "C-c .") 'company-dcd-goto-definition)
 (define-key company-dcd-mode-map (kbd "C-c ,") 'company-dcd-goto-def-pop-marker)
+(define-key company-dcd-mode-map (kbd "C-c s") 'company-dcd-ivy-search-symbol)
 
 ;;;###autoload
 (define-minor-mode company-dcd-mode "company-backend for Dlang Completion Demon, aka DCD."
