@@ -49,6 +49,12 @@
   :group 'company-dcd
   :type 'file)
 
+(defcustom company-dcd-compiler
+  "dmd"
+  "Name of dlang compiler executable."
+  :group 'company-dcd
+  :type 'file)
+
 (defcustom company-dcd--flags nil
   "Extra flags to pass to the dcd-server.
 This variable will typically contain include paths,
@@ -833,11 +839,11 @@ paths from stderr.
 
 This method avoids needing to find the correct dmd.conf and parsing it correctly."
   (with-temp-buffer
-    (call-process "dmd" nil t nil "company-dcd-nonexisting-file-test")
+    (call-process company-dcd-compiler nil t nil "company-dcd-nonexisting-file-test")
     (goto-char (point-min))
     (let (lines)
       (while (re-search-forward company-dcd--dmd-import-path-pattern nil t)
-	(push (concat "-I" (match-string-no-properties 1)) lines))
+        (push (concat "-I" (match-string-no-properties 1)) lines))
       (nreverse lines))))
 
 (defun company-dcd--add-imports ()
