@@ -833,7 +833,7 @@ paths from stderr.
 
 This method avoids needing to find the correct dmd.conf and parsing it correctly."
   (with-temp-buffer
-    (call-process "dmd" nil t nil "company-dcd-nonexisting-file-test")
+    (call-process (if (getenv "DMD") (getenv "DMD") "dmd") nil t nil "company-dcd-nonexisting-file-test")
     (goto-char (point-min))
     (let (lines)
       (while (re-search-forward company-dcd--dmd-import-path-pattern nil t)
