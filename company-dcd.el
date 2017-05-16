@@ -812,6 +812,23 @@ Else, read query."
   "Get current dub project dir"
   (fldd--get-project-dir))
 
+(defun company-dcd--get-include-dirs ()
+  "Get include dir using dub."
+  (fldd--get-dub-package-dirs))
+
+(defun company-dcd--initialize-imports-cache ()
+  (setq company-dcd--imports-cache (make-hash-table :test #'equal)))
+
+(defun company-dcd--delete-imports-cache ()
+  (interactive)
+  (company-dcd--initialize-imports-cache))
+
+(defun company-dcd--put-imports-cache (project-root-dir import-dirs)
+  (puthash project-root-dir import-dirs company-dcd--imports-cache))
+
+(defun company-dcd--get-imports-cache (project-root-dir)
+  (gethash project-root-dir company-dcd--imports-cache))
+
 (defun company-dcd--parent-directory (dir)
   "Return parent directory of DIR."
   (when dir
@@ -856,13 +873,23 @@ This method avoids needing to find the correct dmd.conf and parsing it correctly
   "Send import flags of the current DUB project to dcd-server.
 
 The root of the project is determined by the \"closest\" dub.json
-or package.json file."
+or package.json file.
+If cache was found, use it instead of calling dub."
   (interactive)
-  (company-dcd--call-process
-   (append
-    (company-dcd--build-args)
-    (company-dcd--find-imports-dmd)
-    (company-dcd--find-imports-dub))))
+  (let* ((proj-dir (company-dcd--get-project-dir))
+	 (cached-imports (and proj-dir (company-dcd--get-imports-cache proj-dir)))
+	 (cached-or-dub-imports (or cached-imports (company-dcd--find-imports-dub))))
+
+    ;; if cached-imports is not available, put dub-imports to cache.
+    (when (not cached-imports)
+      (company-dcd--put-imports-cache proj-dir cached-or-dub-imports))
+
+    (company-dcd--call-process
+     (append
+      (company-dcd--build-args)
+      (company-dcd--find-imports-dmd)
+      cached-or-dub-imports
+      ))))
 
 (defvar company-dcd-mode-map (make-keymap))
 (define-key company-dcd-mode-map (kbd "C-c ?") 'company-dcd-show-ddoc-with-buffer)
