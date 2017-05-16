@@ -759,12 +759,12 @@ Return a list of `company-dcd--position-data' structs."
   (with-current-buffer (company-dcd--find-file-of-pos-data pos-data)
     (company-dcd--goto-char-of-pos-data pos-data)
     (let ((line-string (company-dcd--line-string-at-pos)))
-  (format "%s:%s:%s\n%s"
-	  (company-dcd--position-data-file pos-data)
-	  (company-dcd--position-data-type pos-data)
-	  (company-dcd--position-data-offset pos-data)
-	  line-string)
-  )))
+      (format "%s:%s:%s\n%s"
+	      (company-dcd--position-data-file pos-data)
+	      (company-dcd--position-data-type pos-data)
+	      (company-dcd--position-data-offset pos-data)
+	      line-string)
+      )))
 
 (defun company-dcd--ivy-candidate-string-to-pos-data (str)
   (string-match (rx (submatch (* nonl)) ":" (submatch (* nonl)) ":" (submatch (* nonl)) "\n" (* nonl)) str)
