@@ -805,6 +805,12 @@ Else, read query."
     ))
 
 ;;; Automatic import path detection.
+(defvar company-dcd--imports-cache (make-hash-table :test #'equal)
+  "A cache variable to store import paths from dub.")
+
+(defun company-dcd--get-project-dir ()
+  "Get current dub project dir"
+  (fldd--get-project-dir))
 
 (defun company-dcd--parent-directory (dir)
   "Return parent directory of DIR."
@@ -823,9 +829,9 @@ Else, read query."
 
 (defun company-dcd--find-imports-dub ()
   "Extract import flags from \"dub describe\" output."
-  (let ((basedir (fldd--get-project-dir)))
+  (let ((basedir (company-dcd--get-project-dir)))
     (if basedir
-	(mapcar (lambda (x) (concat "-I" x)) (fldd--get-dub-package-dirs))
+	(mapcar (lambda (x) (concat "-I" x)) (company-dcd--get-include-dirs))
       nil)))
 
 (defconst company-dcd--dmd-import-path-pattern
