@@ -81,7 +81,8 @@ You can't put port number flag here.  Set `company-dcd--server-port' instead."
 
 (defcustom company-dcd--server-port 9166
   "Port number of dcd-server.  The default is 9166."
-  :group 'company-dcd)
+  :group 'company-dcd
+  :type 'integer)
 
 (defvar company-dcd--delay-after-kill-process 200
   "Duration to wait after killing the server process, in milliseconds.
@@ -92,7 +93,8 @@ If `company-dcd-restart-server' does not work correctly, please set this variabl
 
 (defcustom company-dcd--ignore-template-argument nil
   "If non-nil, ignore template argument of calltip candidate."
-  :group 'company-dcd)
+  :group 'company-dcd
+  :type 'boolean)
 
 ;; Server management functions
 
@@ -371,7 +373,8 @@ When the symbol is not a function, return nil."
 	   (and bol (* nonl) "(" (*? nonl) ")" "(" (* nonl)")" eol))))
 (defcustom company-dcd--ignore-template-argument t
   "If non-nil, ignore template argument on calltip expansion."
-  :group 'company-dcd)
+  :group 'company-dcd
+  :type 'boolean)
 
 (defsubst company-dcd--cleanup-function-candidate (s)
   "Helper function for parsing calltips.
@@ -634,7 +637,8 @@ Return the result."
 
 (defcustom company-dcd--goto-definition-marker-ring-length 16
   "Length of marker ring to store `company-dcd-goto-definition' call positions."
-  :group 'company-dcd)
+  :group 'company-dcd
+  :type 'integer)
 
 (defvar company-dcd--goto-definition-marker-ring
   (make-ring company-dcd--goto-definition-marker-ring-length)
