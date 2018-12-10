@@ -98,6 +98,10 @@ If `company-dcd-restart-server' does not work correctly, please set this variabl
 
 ;; Server management functions
 
+(defun company-dcd--error (msg)
+  "Signal a company-dcd error with the given MSG."
+  (error (concat "company-dcd error: " msg)))
+
 (defun company-dcd-stop-server ()
   "Stop dcd-server manually.  You shouldn't need to call this function directly.
 
@@ -109,7 +113,7 @@ If you need to restart the server, use `company-dcd-restart-server' instead."
   "Start dcd-server."
 
   (unless (executable-find company-dcd-server-executable)
-    (error "company-dcd error: dcd-server not found"))
+    (company-dcd--error "Could not find dcd-server"))
   
   (let (buf args proc)
     (setq buf (get-buffer-create company-dcd--server-buffer-name))
@@ -149,7 +153,7 @@ If you need to restart the server, use `company-dcd-restart-server' instead."
       (let ((str (company-dcd--call-process '("--version")))
 	    verstr)
 	(unless str
-	  (error "company-dcd error: Error obtaining dcd-server version"))
+	  (company-dcd--error "Error obtaining dcd-server version"))
 	(string-match (rx "v" (submatch (* nonl)) (or "-" "\n")) str)
 	(setq verstr (match-string 1 str))
 	(setq company-dcd--version (string-to-number verstr))
@@ -652,10 +656,10 @@ Return the result."
   "Goto the point where `company-dcd-goto-definition' was last called."
   (interactive)
   (if (ring-empty-p company-dcd--goto-definition-marker-ring)
-      (error "Marker ring is empty, can't pop")
+      (company-dcd--error "Marker ring is empty, can't pop")
     (let ((marker (ring-remove company-dcd--goto-definition-marker-ring 0)))
       (switch-to-buffer (or (marker-buffer marker)
-                            (error "Buffer has been deleted")))
+                            (company-dcd--error "Buffer has been deleted")))
       (goto-char (marker-position marker))
       ;; Cleanup the marker so as to avoid them piling up.
       (set-marker marker nil nil))))
