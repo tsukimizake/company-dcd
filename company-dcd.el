@@ -236,6 +236,23 @@ holding the dcd-client output, or nil in case of error."
   "Get the current cursor position to pass to dcd-client."
   (1- (position-bytes (point))))
 
+(defun company-dcd--word-char-p (char)
+  "Return t if CHAR is a D word char (part of an identifier), nil otherwise."
+  (member (char-syntax char) '(?w ?_)))
+
+(defun company-dcd--symbol-position ()
+  "Return a number representing a position of the symbol at point.
+
+The returned value is suitable for dcd-client queries which
+operate on complete symbols, such as --symbolLocation and --doc."
+  (let ((pos (company-dcd--cursor-position)))
+
+    ;; Work around https://github.com/Hackerpilot/DCD/issues/98
+    (if (and (not (company-dcd--word-char-p (char-before (point))))
+	     (company-dcd--word-char-p (char-after (point))))
+	(1+ pos)
+      pos)))
+
 (defun company-dcd--build-args (&optional pos)
   "Build the argument list to pass to dcd-client.
 
@@ -603,7 +620,7 @@ Invoke CALLBACK with the result, or nil on error or if the symbol
 is not documented."
   (company-dcd--call-process
    (append
-    (company-dcd--build-args (company-dcd--cursor-position))
+    (company-dcd--build-args (company-dcd--symbol-position))
     '("--doc"))
    t
    (lambda (buf)
@@ -746,26 +763,15 @@ Invoke CALLBACK with (buffer . position), or nil in case of error."
 
 ;; Utilities for goto-definition
 
-(defun company-dcd--word-char-p (char)
-  "Return t if CHAR is a D word char (part of an identifier), nil otherwise."
-  (member (char-syntax char) '(?w ?_)))
-
 (defun company-dcd--call-process-for-symbol-declaration (callback)
   "Call process for `dcd-client --symbolLocation'.
 
 Invoke CALLBACK with the dcd-client output buffer, or nil in case
 of error."
-  (let ((pos (company-dcd--cursor-position)))
-
-    ;; Work around https://github.com/Hackerpilot/DCD/issues/98
-    (when (and
-	   (not (company-dcd--word-char-p (char-before (point))))
-	   (company-dcd--word-char-p (char-after (point))))
-      (setq pos (1+ pos)))
-
-    (company-dcd--call-process
-     (append (company-dcd--build-args pos) '("--symbolLocation"))
-     t callback)))
+  (company-dcd--call-process
+   (append (company-dcd--build-args (company-dcd--symbol-position))
+	   '("--symbolLocation"))
+   t callback))
 
 (defun company-dcd--parse-output-for-get-symbol-declaration (buf)
   "Parse output of `company-dcd--get-symbol-declaration' from BUF.
