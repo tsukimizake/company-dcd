@@ -198,11 +198,12 @@ containing the completion kind."
 
 ;; Utility functions for process invocation
 
-(defun company-dcd--call-process (args callback)
+(defun company-dcd--call-process (args send-buffer callback)
   "Asynchronously call dcd-client with ARGS.  Invoke CALLBACK with results.
 
-The current buffer's contents is passed to dcd-client via stdin.
-\(The entire buffer is sent, even if narrowed.)
+If SEND-BUFFER is non-nil, the current buffer's contents is
+passed to dcd-client via stdin.  (The entire buffer is sent, even
+if narrowed.)
 
 CALLBACK is invoked as (BUFFER), where BUFFER is the buffer
 holding the dcd-client output, or nil in case of error."
@@ -225,8 +226,10 @@ holding the dcd-client output, or nil in case of error."
 			      (company-dcd--handle-error buf (string-trim event) args))
 			    (setq callback nil)
 			    (kill-buffer buf))))))
-	  (process-send-region process 1 (1+ (buffer-size)))
-	  (process-send-eof process))
+	  (when send-buffer
+	    (process-send-region process 1 (1+ (buffer-size))))
+	  (when (or send-buffer (process-live-p process))
+	    (process-send-eof process)))
       (message "company-dcd error: could not find dcd-client executable"))))
 
 (defsubst company-dcd--cursor-position ()
@@ -260,6 +263,7 @@ Invoke CALLBACK with candidates, or nil in case of error."
   (unless (company-dcd--in-string/comment)
     (company-dcd--call-process
      (company-dcd--build-args (company-dcd--cursor-position))
+     t
      (lambda (buf)
        (funcall callback
 		(when buf (company-dcd--parse-output-for-completion buf)))))))
@@ -369,7 +373,7 @@ CALLBACK is invoked with the result buffer."
 
       (company-dcd--call-process
        (company-dcd--build-args (company-dcd--cursor-position))
-       callback))))
+       t callback))))
 
 
 (defconst company-dcd--normal-calltip-pattern
@@ -601,6 +605,7 @@ is not documented."
    (append
     (company-dcd--build-args (company-dcd--cursor-position))
     '("--doc"))
+   t
    (lambda (buf)
      (funcall
       callback
@@ -650,7 +655,7 @@ of error."
        (append
 	(company-dcd--build-args (company-dcd--cursor-position))
 	(list switch))
-       callback))))
+       t callback))))
 
 (defun company-dcd--get-completion-documentation (lastcompl callback)
   "Company callback for displaying the documentation for a completion candidate.
@@ -760,7 +765,7 @@ of error."
 
     (company-dcd--call-process
      (append (company-dcd--build-args pos) '("--symbolLocation"))
-     callback)))
+     t callback)))
 
 (defun company-dcd--parse-output-for-get-symbol-declaration (buf)
   "Parse output of `company-dcd--get-symbol-declaration' from BUF.
@@ -805,7 +810,7 @@ of error."
           (company-dcd--build-args)
           '("--search")
 	  (list str))))
-    (company-dcd--call-process args callback)))
+    (company-dcd--call-process args t callback)))
 
 (defun company-dcd--symbol-search (str callback)
   "Search symbol using DCD with query STR.
@@ -966,6 +971,7 @@ If cache was found, use it instead of calling dub."
       (company-dcd--build-args)
       (company-dcd--find-imports-dmd)
       cached-or-dub-imports)
+     nil
      (lambda (_buf)))))
 
 (defvar company-dcd-mode-map (make-keymap))
