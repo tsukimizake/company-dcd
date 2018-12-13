@@ -598,8 +598,7 @@ COMMAND and ARG are the completion command and arguments."
 ;; Documentation display
 
 (defun company-dcd--reformat-documentation ()
-  "Prepare a documentation string for display.
-Currently, it simply unescapes `\\n' unless it's in $(D ...) closure."
+  "Decode (unescape) the documentation text received from dcd-client."
   (with-current-buffer (get-buffer company-dcd--documentation-buffer-name)
     (goto-char (point-min))
     (while (not (equal (point) (point-max)))
@@ -607,11 +606,11 @@ Currently, it simply unescapes `\\n' unless it's in $(D ...) closure."
        ((looking-at (rx "\\n"))
 	(delete-char 2)
 	(insert "\n"))
-       ((looking-at (rx "$(")) ; skip D expr.
-	(forward-sexp 2))
-       )
-      (forward-char))
-    ))
+       ((looking-at (rx "\\\\"))
+	(delete-char 1)
+	(forward-char))
+       (t
+	(forward-char))))))
 
 (defun company-dcd--get-ddoc (callback)
   "Retrieve symbol documentation using \"dcd-client --doc\".
