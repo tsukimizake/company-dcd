@@ -188,11 +188,12 @@ containing the completion kind."
     (with-current-buffer errbuf
       (erase-buffer)
       (insert (format
-	       "%s\n\"%s\" failed (%s).\nError type is: %s\n"
+	       "%s\n\"%s\" failed (%s).\nError type is: %s\n\ndcd-client output:\n\n%s"
 	       (current-time-string)
 	       cmd
 	       err
-	       errstr))
+	       errstr
+	       (with-current-buffer outbuf (buffer-string))))
       (goto-char (point-min)))
     (display-buffer errbuf)))
 
