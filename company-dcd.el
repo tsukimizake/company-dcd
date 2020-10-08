@@ -810,7 +810,7 @@ Output is a `company-dcd--position-data', whose `type' is nil."
 ;;; Symbol search.
 
 (defvar company-dcd--symbol-search-pattern
-  (rx (and bol (submatch (* nonl)) "\t" (submatch char) "\t" (submatch (* digit)) eol))
+  (rx (and bol (submatch (* nonl)) "\t" (submatch nonl) "\t" (submatch (* digit)) eol))
   "Regex pattern to parse dcd output for symbol location.")
 
 (defun company-dcd--parse-output-for-symbol-search (buf)
