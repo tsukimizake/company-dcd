@@ -970,6 +970,8 @@ paths from stderr.
 
 This method avoids needing to find the correct dmd.conf and parsing it correctly."
   (with-temp-buffer
+    (when (not (file-accessible-directory-p default-directory))
+      (setq default-directory (expand-file-name "~")))
     (call-process company-dcd-compiler nil t nil "company-dcd-nonexisting-file-test")
     (goto-char (point-min))
     (let (lines)
