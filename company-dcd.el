@@ -744,6 +744,11 @@ Invoke CALLBACK with the documentation string, or nil in case of error."
 
 (cl-defstruct company-dcd--position-data file type offset)
 
+(defun company-dcd--file-path (file)
+  (if (eq system-type 'cygwin)
+      (cygwin-convert-file-name-from-windows file)
+    file))
+
 (defun company-dcd-goto-definition ()
   "Goto declaration of symbol at point."
   (interactive)
@@ -802,7 +807,7 @@ Output is a `company-dcd--position-data', whose `type' is nil."
     (if (not (string= "Not found\n" (buffer-string)))
         (progn (re-search-forward (rx (submatch (* nonl)) "\t" (submatch (* nonl)) "\n"))
                (make-company-dcd--position-data
-		:file (match-string 1)
+		:file (company-dcd--file-path (match-string 1))
 		:offset (1+ (string-to-number (match-string 2)))))
       nil))
   )
@@ -820,7 +825,7 @@ Output is a `company-dcd--position-data', whose `type' is nil."
     (let (res)
       (while (re-search-forward company-dcd--symbol-search-pattern nil t)
 	(push (make-company-dcd--position-data
-	       :file (match-string 1)
+	       :file (company-dcd--file-path (match-string 1))
 	       :type (match-string 2)
 	       :offset (string-to-number (match-string 3)))
 	      res))
@@ -869,7 +874,8 @@ structs, or nil in case of error."
   (let ((file (match-string 1 str))
 	(type (match-string 2 str))
 	(offset (string-to-number (match-string 3 str))))
-    (make-company-dcd--position-data :file file :type type :offset offset)))
+    (make-company-dcd--position-data
+     :file (company-dcd--file-path file) :type type :offset offset)))
 
 (defun company-dcd--find-file-of-pos-data (pos-data)
   "Return buffer corresponding to `company-dcd--position-data' POS-DATA, creating it if necessary."
