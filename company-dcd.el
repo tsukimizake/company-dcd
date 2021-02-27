@@ -64,7 +64,7 @@ You can't put port number flag here.  Set `company-dcd--server-port' instead."
   :type '(repeat (string :tag "Argument" "")))
 
 (defconst company-dcd--completion-pattern
-  (rx bol (submatch (1+ nonl)) "\t" (submatch (any "cisuvmkfgePMaAltT")) eol)
+  (rx bol (submatch (1+ nonl)) "\t" (submatch (any "cisuvmkfgePMaAltT")) (? "\r") eol)
   "Regex to parse dcd output.
 \\1 is candidate itself, \\2 is kind of candidate.")
 
@@ -137,7 +137,7 @@ If you need to restart the server, use `company-dcd-restart-server' instead."
 
   (unless (executable-find company-dcd-server-executable)
     (company-dcd--error "Could not find dcd-server"))
-  
+
   (let (buf args proc)
     (setq buf (get-buffer-create company-dcd--server-buffer-name))
     (setq args (nconc (list company-dcd-server-executable)
@@ -181,7 +181,7 @@ containing the completion kind."
 	  )
       (while (re-search-forward pattern nil t)
 	(setq match (match-string-no-properties 1))
-	
+
 	(setq detailed-info (match-string-no-properties 2))
 	(when detailed-info
 	  (setq match (propertize match 'company-dcd--help detailed-info)))
@@ -193,7 +193,7 @@ containing the completion kind."
   (get-text-property 0 'company-dcd--help cand))
 
 (defvar company-dcd--error-message-regexp
-  (rx (and (submatch (* nonl))  ": " (submatch (* nonl)) ": " (submatch (* nonl) eol)))
+  (rx (and (submatch (* nonl))  ": " (submatch (* nonl)) ": " (submatch (* nonl) (? "\r") eol)))
   "If this regexp matches the first line of dcd-client output, it indicates an error message.")
 
 (defun company-dcd--handle-error (outbuf err args)
@@ -284,7 +284,7 @@ Optionally, pass POS as the --cursorPos argument if non-nil."
    (company-dcd--server-address-flags)
    (when pos
      (list
-      (concat "-I" default-directory)
+      (concat "-I" (expand-file-name default-directory))
       "--cursorPos"
       (format "%s" pos)))))
 
@@ -415,15 +415,15 @@ CALLBACK is invoked with the result buffer."
 
 
 (defconst company-dcd--normal-calltip-pattern
-  (rx bol (submatch (* nonl)) (submatch "(" (* nonl) ")") eol)
+  (rx bol (submatch (* nonl)) (submatch "(" (* nonl) ")") (? "\r") eol)
   "Regexp to parse calltip completion.
 \\1 is function return type (if exists) and name, and \\2 is args.")
 (defconst company-dcd--template-pattern (rx (submatch (* nonl)) (submatch "(" (*? nonl) ")") (submatch "(" (* nonl)")"))
   "Regexp to parse template calltips.
 \\1 is function return type (if exists) and name, \\2 is template args, and \\3 is args.")
 (defconst company-dcd--calltip-pattern
-  (rx  (or (and bol (* nonl) "(" (* nonl) ")" eol)
-	   (and bol (* nonl) "(" (*? nonl) ")" "(" (* nonl)")" eol))))
+  (rx  (or (and bol (* nonl) "(" (* nonl) ")" (? "\r") eol)
+	   (and bol (* nonl) "(" (*? nonl) ")" "(" (* nonl)")" (? "\r") eol))))
 (defcustom company-dcd--ignore-template-argument t
   "If non-nil, ignore template argument on calltip expansion."
   :group 'company-dcd
@@ -518,7 +518,7 @@ Returns a list of calltip candidates."
 (defsubst company-dcd--format-calltips (str)
   "Format calltips STR in parenthesis to yasnippet style."
   (let (yasstr)
-    
+
     ;;remove parenthesis
     (setq str (substring str 1 (1- (length str))))
 
@@ -548,7 +548,7 @@ LASTCOMPL is the last completion, as received from company."
 	 res)
     (delete-region arg-beg end)
     (setq res (company-dcd--format-calltips args))
-    
+
     (when template-beg
       (let ((template-args (buffer-substring template-beg arg-beg)))
 	(delete-region template-beg arg-beg)
@@ -815,7 +815,7 @@ Output is a `company-dcd--position-data', whose `type' is nil."
 ;;; Symbol search.
 
 (defvar company-dcd--symbol-search-pattern
-  (rx (and bol (submatch (* nonl)) "\t" (submatch nonl) "\t" (submatch (* digit)) eol))
+  (rx (and bol (submatch (* nonl)) "\t" (submatch nonl) "\t" (submatch (* digit)) (? "\r") eol))
   "Regex pattern to parse dcd output for symbol location.")
 
 (defun company-dcd--parse-output-for-symbol-search (buf)
@@ -966,7 +966,7 @@ Else, read query."
       nil)))
 
 (defconst company-dcd--dmd-import-path-pattern
-  (rx bol "import path[" (one-or-more digit) "] = " (submatch (one-or-more not-newline)) eol))
+  (rx bol "import path[" (one-or-more digit) "] = " (submatch (one-or-more not-newline)) (? "\r") eol))
 
 (defun company-dcd--find-imports-dmd ()
   "Extract import flags from dmd configuration.
@@ -982,7 +982,12 @@ This method avoids needing to find the correct dmd.conf and parsing it correctly
     (goto-char (point-min))
     (let (lines)
       (while (re-search-forward company-dcd--dmd-import-path-pattern nil t)
-        (push (concat "-I" (match-string-no-properties 1)) lines))
+        (push
+         (concat "-I"
+                 (replace-regexp-in-string
+                  "\r$" ""
+                  (company-dcd--file-path (match-string-no-properties 1))))
+         lines))
       (nreverse lines))))
 
 (defun company-dcd--add-imports ()
