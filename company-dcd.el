@@ -79,6 +79,8 @@ You can't put port number flag here.  Set `company-dcd--server-port' instead."
   :group 'company-dcd
   :type 'file)
 
+(define-obsolete-variable-alias 'company-dcd--server-port 'company-dcd-server-address "2019-01-15")
+
 (defcustom company-dcd-server-address nil
   "Port number / UNIX socket path of dcd-server.
 
@@ -93,8 +95,6 @@ The default is nil."
 	  (const :tag "Use platform default" nil)
 	  (integer :tag "Use this TCP port number")
 	  (file :tag "Use this UNIX socket path")))
-
-(define-obsolete-variable-alias 'company-dcd--server-port 'company-dcd-server-address)
 
 (defvar company-dcd--delay-after-kill-process 200
   "Duration to wait after killing the server process, in milliseconds.
