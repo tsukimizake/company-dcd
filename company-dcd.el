@@ -233,7 +233,10 @@ if narrowed.)
 CALLBACK is invoked as (BUFFER), where BUFFER is the buffer
 holding the dcd-client output, or nil in case of error."
   (let* ((index (cl-incf company-dcd--counter))
-	 (buf (get-buffer-create (format company-dcd--output-buffer-name-template index))))
+	 (buf (get-buffer-create (format company-dcd--output-buffer-name-template index)))
+	 (default-directory (if (file-accessible-directory-p default-directory)
+				default-directory
+			      (expand-file-name "~"))))
     (with-current-buffer buf (erase-buffer))
     (if (executable-find company-dcd-client-executable)
 	(let ((process (make-process
