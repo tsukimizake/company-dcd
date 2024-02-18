@@ -137,14 +137,16 @@ If you need to restart the server, use `company-dcd-restart-server' instead."
 
   (unless (executable-find company-dcd-server-executable)
     (company-dcd--error "Could not find dcd-server"))
-  
+
   (let (buf args proc)
     (setq buf (get-buffer-create company-dcd--server-buffer-name))
     (setq args (nconc (list company-dcd-server-executable)
 		      (company-dcd--server-address-flags)
 		      company-dcd--flags))
     (setq proc
-	  (with-current-buffer buf (apply 'start-process "dcd-server" (current-buffer) args)))
+	  (with-current-buffer buf
+	    (let ((default-directory (expand-file-name "~")))
+	      (apply 'start-process "dcd-server" (current-buffer) args))))
     (set-process-query-on-exit-flag proc nil)))
 
 (defun company-dcd--server-is-alive-p ()
