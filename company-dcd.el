@@ -245,6 +245,7 @@ holding the dcd-client output, or nil in case of error."
 			:stderr buf
 			:command (cons company-dcd-client-executable args)
 			:noquery t
+			:connection-type 'pipe
 			:sentinel
 			(lambda (_process event)
 			  (when callback
