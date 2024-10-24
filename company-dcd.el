@@ -2,7 +2,7 @@
 
 ;; Author: tsukimizake <shomasd_at_gmail.com>
 ;; Version: 0.1
-;; Package-Requires: ((company "0.9") (flycheck-dmd-dub "0.7") (yasnippet "0.8") (popwin "0.7") (cl-lib "0.5"))
+;; Package-Requires: ((company "0.9") (flycheck-dmd-dub "0.7") (yasnippet "0.8") (popwin "0.7") (cl-lib "0.5") (ivy "20160804.326"))
 ;; Keywords: languages
 ;; URL: http://github.com/tsukimizake/company-dcd
 
@@ -40,6 +40,7 @@
 (require 'ring)
 (require 'cl-lib)
 (require 'popwin)
+(require 'ivy)
 (defgroup company-dcd nil "company-mode backend for DCD." :group 'company)
 
 (defcustom company-dcd-client-executable
@@ -1022,8 +1023,7 @@ If cache was found, use it instead of calling dub."
 (define-key company-dcd-mode-map (kbd "C-c ?") 'company-dcd-show-ddoc-with-buffer)
 (define-key company-dcd-mode-map (kbd "C-c .") 'company-dcd-goto-definition)
 (define-key company-dcd-mode-map (kbd "C-c ,") 'company-dcd-goto-def-pop-marker)
-(when (fboundp 'ivy-format-function-arrow)
-  (define-key company-dcd-mode-map (kbd "C-c s") 'company-dcd-ivy-search-symbol))
+(define-key company-dcd-mode-map (kbd "C-c s") 'company-dcd-ivy-search-symbol)
 
 ;;;###autoload
 (define-minor-mode company-dcd-mode "company-backend for Dlang Completion Demon, aka DCD."
